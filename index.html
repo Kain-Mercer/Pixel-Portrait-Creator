@@ -493,10 +493,18 @@ const RIG = (function () {
   }
 
   // ---------- geometry ----------
-  // Female faces narrow by up to 1.6 px over rows 30-40 (below the eyes) and taper to longer, slimmer chins.
-  const FEM_TAPER = 1.6;
+  // Female faces narrow slightly below the eyes (rows 31-40), by a per-shape amount. "soft" is the
+  // farm-sim style face: barely narrowed, a short full U-jaw and a broad rounded chin. It must always
+  // stay available and soft; slimmer looks belong to the other shapes.
+  const FEM_TAPER = { soft: 0.3, round: 0.9, oval: 1.1, heart: 1.2 };
+  // [jaw length, chin half-width, taper exponent p, fullness q (lower = fuller cheeks)]
+  const JAWS = {
+    masc: { soft: [7.4, 5.4, 2.2, 0.7], round: [7.6, 5.2, 2.2, 0.75], oval: [8.0, 4.2, 1.7, 0.95], heart: [8.2, 3.6, 1.35, 1.1] },
+    fem:  { soft: [7.5, 5.0, 2.1, 0.72], round: [7.8, 4.6, 2.0, 0.85], oval: [8.2, 3.8, 1.6, 1.0], heart: [8.4, 3.3, 1.35, 1.1] },
+  };
   function headHW(shape, y, sex) {
     const fem = sex === 'fem';
+    const taper = fem ? (FEM_TAPER[shape] || 0) : 0;
     if (y < 22) {
       const top = shape === 'oval' ? 8.0 : shape === 'square' ? 9.2 : 8.7;
       if (y < top) return 0;
@@ -505,12 +513,10 @@ const RIG = (function () {
       if (shape === 'heart') return 13.9 * Math.pow(1 - Math.pow(t, 2.4), 1 / 2.4) - 0.4 * (1 - t);
       return 13.5 * Math.sqrt(1 - t * t);
     }
-    if (y <= 40) return 13.5 - 1.5 * smooth(27, 40, y) - (fem ? FEM_TAPER * smooth(30, 40, y) : 0);
-    const j = y - 40, w0 = 12 - (fem ? FEM_TAPER : 0);
+    if (y <= 40) return 13.5 - 1.5 * smooth(27, 40, y) - taper * smooth(31, 40, y);
+    const j = y - 40, w0 = 12 - taper;
     // jaw tapers from the face plate to a rounded chin of half-width `chin`, closing over the last 2.2 rows
-    const JAW = (fem
-      ? { round: [8.2, 3.8, 1.8, 1.0], oval: [8.6, 3.0, 1.45, 1.1], heart: [8.8, 2.6, 1.2, 1.25] }
-      : { round: [7.6, 5.2, 2.2, 0.75], oval: [8.0, 4.2, 1.7, 0.95], heart: [8.2, 3.6, 1.35, 1.1] })[shape];
+    const JAW = JAWS[fem ? 'fem' : 'masc'][shape];
     if (JAW) {
       const [L, chin, p, q] = JAW, body = L - 2.2;
       if (j > L) return 0;
@@ -1864,7 +1870,7 @@ const RIG = (function () {
   }
 
   const OPTIONS = {
-    headShape: ['round', 'oval', 'square', 'heart'],
+    headShape: ['round', 'oval', 'square', 'heart', 'soft'],
     ears: ['normal', 'small', 'pointed'],
     build: ['slim', 'broad'],
     hairStyle: Object.keys(HAIR),
@@ -1951,7 +1957,7 @@ const RIG = (function () {
       const list = allowed(world, k, sex);
       if (!list.includes(out[k])) out[k] = k === 'backdrop' ? list[0] : (list.includes('none') ? 'none' : list[0]);
     });
-    if (!allowed(world, 'headShape', sex).includes(state.headShape)) out.headShape = sex === 'masc' ? 'square' : 'heart';
+    if (!allowed(world, 'headShape', sex).includes(state.headShape)) out.headShape = sex === 'masc' ? 'square' : 'soft';
     // Changing world always brings that world's signature backdrop, even if the old one is still allowed.
     if (state.world !== world) out.backdrop = allowed(world, 'backdrop', sex)[0];
     out.glow = (WORLDS[world] || WORLDS.cosmos).glow;
@@ -1971,11 +1977,13 @@ const RIG = (function () {
   };
   const SEX_WEIGHTS = {
     fem: {
+      headShape: { soft: 3, round: 2, oval: 1.5, heart: 1.2 },
       hairStyle: { long: 3, wavy: 3, bob: 3, ponytail: 3, buns: 2, braid: 2, curly: 2, tousled: 0.8, sidepart: 0.6, undercut: 0.6, mohawk: 0.3, sleek: 2.5, mane: 1.5 },
       mouthStyle: { lips: 2.5 }, lips: { natural: 3, rose: 1.5, berry: 1, coral: 1.2, plum: 0.6 },
       extra: { none: 5, earrings: 3.5, flower: 1.2 },
     },
     masc: {
+      headShape: { square: 2.5, round: 2, oval: 1.5, soft: 1 },
       hairStyle: { tousled: 3, sidepart: 3, spiky: 2, buzz: 2, undercut: 2, curly: 1.5, long: 0.6, ponytail: 0.5, mohawk: 0.6, bald: 0.8, mane: 1.5, sleek: 1.2 },
       extra: { none: 7, earrings: 0.8 },
     },

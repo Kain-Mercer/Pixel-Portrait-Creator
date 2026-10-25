@@ -40,7 +40,6 @@ h1 span{color:var(--flare);}
 .seed{font-family:var(--font-display); font-size:11px; color:var(--faint); letter-spacing:1px;}
 
 .worlds{display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:10px;}
-@media (max-width:640px){ .worlds{grid-template-columns:minmax(0,1fr);} }
 .world{text-align:left; display:flex; flex-direction:column; gap:4px; padding:12px 14px; border-radius:12px; background:var(--hull); border:1px solid var(--rim);}
 .world b{font-family:var(--font-display); font-weight:400; font-size:13px; letter-spacing:.5px;}
 .world span{color:var(--dim); font-size:12.5px; line-height:1.4;}
@@ -49,9 +48,24 @@ h1 span{color:var(--flare);}
 :root[data-world="country"]{--flare:#f2c45a; --flare-ink:#2a1e06; --nebula:#4f8f6a;}
 :root[data-world="underpass"]{--flare:#ff4fa8; --flare-ink:#2a0618; --nebula:#2fb6c8;}
 .studio{display:grid; grid-template-columns:minmax(0, 480px) minmax(0,1fr); gap:22px; align-items:start;}
-@media (max-width:900px){ .studio{grid-template-columns:minmax(0,1fr);} .viewport{position:static;} }
+@media (max-width:900px){ .studio{grid-template-columns:minmax(0,1fr);} }
 
-.viewport{position:sticky; top:max(12px, env(safe-area-inset-top,0px)); background:var(--hull); border:1px solid var(--rim); border-radius:14px; padding:16px; display:flex; flex-direction:column; gap:14px;}
+.left{display:flex; flex-direction:column; gap:14px; min-width:0;}
+@media (min-width:901px) and (min-height:760px){ .left{position:sticky; top:max(12px, env(safe-area-inset-top,0px));} }
+.viewport{background:var(--hull); border:1px solid var(--rim); border-radius:14px; padding:16px; display:flex; flex-direction:column; gap:14px;}
+.dock-controls{display:flex; flex-direction:column; gap:14px; min-width:0;}
+.refpanel{background:var(--hull); border:1px solid var(--rim); border-radius:14px; padding:14px 16px; display:flex; flex-direction:column; gap:10px;}
+.lbl-short{display:none;}
+.right{display:flex; flex-direction:column; gap:14px; min-width:0;}
+.tplpanel{background:var(--hull); border:1px solid var(--rim); border-radius:14px; padding:14px 16px; display:flex; flex-direction:column; gap:12px;}
+.tplhead{display:flex; flex-direction:column; gap:6px;}
+.tplrow{display:flex; flex-wrap:wrap; gap:8px;}
+.filebtn{display:inline-flex; align-items:center; justify-content:center; font-size:13px; font-weight:600; cursor:pointer; border-radius:8px; border:1px solid var(--flare); background:var(--flare); color:var(--flare-ink); padding:8px 12px;}
+.filebtn:focus-visible, .visually-hidden:focus-visible + .filebtn{outline:2px solid var(--flare); outline-offset:2px;}
+.visually-hidden{position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; border:0;}
+.tplpaste{display:flex; flex-direction:column; gap:8px;}
+.tplpaste textarea{width:100%; min-height:110px; resize:vertical; font:12.5px/1.45 ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace; color:var(--star); background:var(--void); border:1px solid var(--rim-hi); border-radius:8px; padding:10px;}
+.tplpaste textarea:focus-visible{outline:2px solid var(--flare); outline-offset:1px;}
 .frame{position:relative; width:100%; aspect-ratio:1; max-width:100%; border-radius:8px; overflow:hidden;
   background: repeating-conic-gradient(#2a2546 0% 25%, #221e3c 0% 50%) 0 0/24px 24px;
   box-shadow: inset 0 0 0 2px #0a0915, 0 0 0 1px var(--rim-hi);}
@@ -75,11 +89,11 @@ button[aria-pressed="true"]{border-color:var(--nebula); background:#2c2560;}
 .refpick{font-size:11px; text-transform:uppercase; letter-spacing:.9px; color:var(--dim); font-weight:600; width:100%;}
 .refslider{display:flex; align-items:center; gap:8px; color:var(--dim);}
 .refslider input{accent-color:var(--flare); width:120px;}
-.refnote{margin:-4px 0 0; font-size:12px; color:var(--faint); line-height:1.45;}
+.refnote{margin:0; font-size:12px; color:var(--faint); line-height:1.45;}
 .frame img{position:absolute; inset:0; width:100%; height:100%; object-fit:contain; image-rendering:pixelated; pointer-events:none;}
 .drop{position:absolute; inset:0; display:grid; place-items:center; background:rgba(15,13,28,.78); color:var(--flare); font-family:var(--font-display); font-size:13px; border:2px dashed var(--flare); border-radius:8px;}
 
-.picker{background:var(--hull); border:1px solid var(--rim); border-radius:14px; overflow:hidden; min-width:0;}
+.picker{background:var(--hull); border:1px solid var(--rim); border-radius:14px; overflow:hidden; overflow:clip; min-width:0;}
 .tabs{display:flex; gap:2px; padding:8px 8px 0; background:var(--panel); border-bottom:1px solid var(--rim); overflow-x:auto;}
 .tab{border:none; border-radius:8px 8px 0 0; background:transparent; color:var(--dim); font-family:var(--font-display); font-size:11px; letter-spacing:.5px; padding:10px 12px; white-space:nowrap;}
 .tab[aria-selected="true"]{background:var(--hull); color:var(--star);}
@@ -130,6 +144,62 @@ code{font-size:12px; background:var(--panel); border:1px solid var(--rim); borde
 .links a{color:var(--flare); text-decoration:none; border-bottom:1px solid color-mix(in srgb, var(--flare) 40%, transparent);}
 .links a:hover{border-bottom-color:var(--flare);}
 .links a:focus-visible{outline:2px solid var(--flare); outline-offset:2px;}
+
+/* Phones: header compacts, the preview becomes a pinned dock with the main actions beside it,
+   and the part tabs pin directly underneath so every tap is visible on the portrait. */
+@media (max-width:700px){
+  body{padding-block:10px 32px;}
+  .wrap{gap:12px;}
+  h1{font-size:18px;}
+  .sub, .seed{display:none;}
+  .links{margin-top:6px; font-size:12px;}
+  .worlds{gap:6px;}
+  .world{padding:9px 6px; align-items:center; justify-content:center; text-align:center; min-height:44px;}
+  .world b{font-size:10px; line-height:1.3; letter-spacing:.3px;}
+  .world span{display:none;}
+  .studio{gap:12px;}
+  .left{display:contents;}
+  .viewport{order:1; position:sticky; top:0; z-index:30;
+    display:grid; grid-template-columns:minmax(0,43%) minmax(0,1fr); align-items:start; gap:10px;
+    padding:10px; padding-top:calc(10px + env(safe-area-inset-top,0px));
+    border-radius:0 0 14px 14px; border-top:none; box-shadow:0 10px 24px rgba(5,4,12,.55);}
+  .dock-controls{gap:7px;}
+  .sexbar .glabel{display:none;}
+  .seg{display:flex; width:100%;}
+  .seg button{flex:1; padding:8px 2px; font-size:12px;}
+  .actions{display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:6px;}
+  .actions .primary{grid-column:1 / -1;}
+  .actions button{padding:8px 4px; font-size:12px; white-space:nowrap;}
+  .lbl-long{display:none;}
+  .lbl-short{display:inline;}
+  .status{font-size:11px; min-height:14px; line-height:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .right{display:contents;}
+  .picker{order:2;}
+  .tplpanel{order:3;}
+  .tplrow > *{flex:1 1 calc(50% - 8px); text-align:center;}
+  .status:empty{display:none;}
+  .tabs{position:sticky; top:var(--dock-h, 0px); z-index:20;}
+  .tab{flex:1; text-align:center; padding:11px 6px; font-size:10px;}
+  .pane{padding:14px 12px;}
+  .refpanel{order:4;}
+  .roster{padding:12px;}
+}
+@media (max-width:360px){
+  .viewport{grid-template-columns:minmax(0,40%) minmax(0,1fr); gap:8px; padding-inline:8px;}
+  .actions button, .seg button{font-size:11px;}
+}
+/* Touch screens: comfortable tap targets. */
+@media (pointer:coarse){
+  .chip{min-height:40px; padding:8px 13px; font-size:13.5px;}
+  .chips{gap:8px;}
+  .sw{width:36px; height:36px;}
+  .swatches{gap:9px;}
+  .lock{padding:8px 6px;}
+  .toggle{min-height:40px;}
+  .toggle input{width:20px; height:20px;}
+  .filebtn, .tplrow button{min-height:42px;}
+  .dock-controls button{min-height:34px;}
+}
 </style>
 
 <div class="wrap">
@@ -147,13 +217,15 @@ code{font-size:12px; background:var(--panel); border:1px solid var(--rim); borde
   <nav class="worlds" aria-label="Game world" id="worlds"></nav>
 
   <div class="studio">
-    <section class="viewport" aria-label="Portrait preview">
+    <div class="left">
+    <section class="viewport" aria-label="Portrait preview" id="viewport">
       <div class="frame">
         <canvas id="portrait" width="448" height="448" aria-label="Current portrait"></canvas>
         <img id="refImg" alt="" hidden>
         <canvas id="guides" width="448" height="448" aria-hidden="true"></canvas>
         <div class="drop" id="drop" hidden>Drop a reference image</div>
       </div>
+      <div class="dock-controls">
       <div class="sexbar" role="group" aria-label="Gender">
         <span class="glabel">Gender</span>
         <div class="seg" id="sexSeg">
@@ -164,11 +236,15 @@ code{font-size:12px; background:var(--panel); border:1px solid var(--rim); borde
       </div>
       <div class="actions">
         <button class="primary" id="roll">Randomize</button>
-        <button id="guidesBtn" aria-pressed="false">Anchor guides</button>
-        <button id="save64" hidden>Save 64px PNG</button>
-        <button id="save512" hidden>Save 512px PNG</button>
-        <button id="copyRecipe">Copy recipe</button>
+        <button id="guidesBtn" aria-pressed="false"><span class="lbl-long">Anchor guides</span><span class="lbl-short">Guides</span></button>
+        <button id="save64" hidden><span class="lbl-long">Save 64px PNG</span><span class="lbl-short">PNG 64px</span></button>
+        <button id="save512" hidden><span class="lbl-long">Save 512px PNG</span><span class="lbl-short">PNG 512px</span></button>
+        <button id="copyRecipe"><span class="lbl-long">Copy recipe</span><span class="lbl-short">Recipe</span></button>
       </div>
+      <div class="status" id="status" role="status"></div>
+      </div>
+    </section>
+    <section class="refpanel" aria-label="Reference overlay">
       <div class="refbar">
         <label class="refpick" for="refFile">Reference overlay</label>
         <input type="file" id="refFile" accept="image/*">
@@ -176,13 +252,37 @@ code{font-size:12px; background:var(--panel); border:1px solid var(--rim); borde
         <button id="refClear" hidden>Remove</button>
       </div>
       <p class="refnote">Compare proportions against any portrait you own. The image stays in your browser and is never saved or uploaded.</p>
-      <div class="status" id="status" role="status"></div>
     </section>
+    </div>
 
+    <div class="right">
     <section class="picker" aria-label="Parts">
       <div class="tabs" role="tablist" id="tabs"></div>
       <div id="panes"></div>
     </section>
+
+    <section class="tplpanel" aria-label="Templates">
+      <div class="tplhead">
+        <span class="glabel">Templates</span>
+        <p class="refnote">Import characters as JSON: one recipe, a list, or a pack. Partial recipes work as templates: set the parts you care about and the rest is filled from the seed.</p>
+      </div>
+      <div class="tplrow">
+        <label class="filebtn" for="tplFile" tabindex="0">Import file</label>
+        <input type="file" id="tplFile" class="visually-hidden" accept=".json,application/json">
+        <button id="tplPasteBtn" aria-expanded="false" aria-controls="tplPaste">Paste JSON</button>
+        <button id="tplSaveOne">Save recipe file</button>
+        <button id="tplSaveCrew">Save crew file</button>
+      </div>
+      <div class="tplpaste" id="tplPaste" hidden>
+        <label class="glabel" for="tplText">Paste a recipe, a list of recipes or a pack</label>
+        <textarea id="tplText" rows="5" spellcheck="false" placeholder='{"world": "underpass", "sex": "fem", "hairStyle": "undercut"}'></textarea>
+        <div class="tplrow">
+          <button class="primary" id="tplLoad">Load</button>
+          <button id="tplCancel">Cancel</button>
+        </div>
+      </div>
+    </section>
+    </div>
   </div>
 
   <section class="roster" aria-label="Crew roster">
@@ -1900,15 +2000,18 @@ if (typeof module !== 'undefined') module.exports = RIG;
     b.addEventListener('click', () => setWorld(id));
     worldsEl.appendChild(b); return [id, b];
   });
-  function setWorld(id) {
+  function applyWorld(id) {
     world = id;
     try { localStorage.setItem('rig.world', id); } catch (e) {}
     document.documentElement.setAttribute('data-world', id);
     worldBtns.forEach(([k, b]) => b.setAttribute('aria-pressed', k === id ? 'true' : 'false'));
+  }
+  function setWorld(id) {
+    applyWorld(id);
     state = RIG.fit(state, id, state.sex);
     buildPanes();
     update();
-    buildRoster();
+    if (!rosterImported) buildRoster();
   }
 
   // ---- tabs + controls ----
@@ -2026,26 +2129,41 @@ if (typeof module !== 'undefined') module.exports = RIG;
 
   // ---- roster ----
   const rosterEl = document.getElementById('roster');
-  let rosterGen = 0;
-  function buildRoster() {
+  let rosterGen = 0, rosterStates = [], rosterImported = false;
+  function loadCharacter(st, msg) {
+    if (st.world && RIG.WORLDS[st.world] && st.world !== world) applyWorld(st.world);
+    state = RIG.fit(Object.assign({}, st), world, st.sex || state.sex);
+    update();
+    say(msg);
+  }
+  // `items` are states or functions returning one; functions render lazily, one per frame.
+  function renderRoster(items, note) {
     const gen = ++rosterGen;
     rosterEl.textContent = '';
-    document.getElementById('rosterNote').textContent = 'Twelve ' + RIG.WORLDS[world].name + (rollSex === 'either' ? '' : rollSex === 'masc' ? ' male' : ' female') + ' characters generated from seeds. Click one to load it into the editor.';
-    const base = Math.floor(Math.random() * 900000) + 100000;
-    const seeds = Array.from({ length: 12 }, (_, i) => base + i * 104729);
+    rosterStates = [];
+    document.getElementById('rosterNote').textContent = note;
     let i = 0;
     const next = () => {
-      if (i >= seeds.length || gen !== rosterGen) return;
-      const st = RIG.randomState(seeds[i++], world, rollSex);
+      if (i >= items.length || gen !== rosterGen) return;
+      const item = items[i++];
+      const st = typeof item === 'function' ? item() : item;
+      rosterStates.push(st);
       const b = document.createElement('button'); b.className = 'cell';
       b.setAttribute('aria-label', 'Load crew member, seed ' + st.seed);
       const c = document.createElement('canvas'); c.width = 128; c.height = 128;
       b.appendChild(c); rosterEl.appendChild(b);
       RIG.draw(c, st, 2);
-      b.addEventListener('click', () => { state = Object.assign({}, st); update(); say('Loaded crew member ' + st.seed + '.'); window.scrollTo({ top: 0, behavior: 'smooth' }); });
+      b.addEventListener('click', () => { loadCharacter(st, 'Loaded crew member ' + st.seed + '.'); window.scrollTo({ top: 0, behavior: 'smooth' }); });
       requestAnimationFrame(next);
     };
     next();
+  }
+  function buildRoster() {
+    rosterImported = false;
+    const base = Math.floor(Math.random() * 900000) + 100000;
+    const w = world, sx = rollSex;
+    const items = Array.from({ length: 12 }, (_, i) => () => RIG.randomState(base + i * 104729, w, sx));
+    renderRoster(items, 'Twelve ' + RIG.WORLDS[world].name + (rollSex === 'either' ? '' : rollSex === 'masc' ? ' male' : ' female') + ' characters generated from seeds. Click one to load it into the editor.');
   }
 
   // ---- export ----
@@ -2057,10 +2175,8 @@ if (typeof module !== 'undefined') module.exports = RIG;
   let downloads = null;
   const showSave = () => { document.getElementById('save64').hidden = false; document.getElementById('save512').hidden = false; };
   showSave();
-  async function save(scale) {
-    const filename = 'portrait-' + state.seed + (scale === 1 ? '' : '@' + scale + 'x') + '.png';
+  async function saveBlob(filename, blob) {
     if (!downloads) {
-      const blob = await pngBlob(scale);
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url; a.download = filename;
@@ -2070,9 +2186,8 @@ if (typeof module !== 'undefined') module.exports = RIG;
       return;
     }
     try {
-      const blob = await pngBlob(scale);
       await downloads.save({ filename, data: blob });
-      say('Saved.');
+      say('Saved ' + filename + '.');
     } catch (err) {
       const code = err && err.code;
       if (code === 'declined') say('Save cancelled.');
@@ -2080,13 +2195,90 @@ if (typeof module !== 'undefined') module.exports = RIG;
       else say('Saving is not available here.');
     }
   }
+  async function save(scale) {
+    saveBlob('portrait-' + state.seed + (scale === 1 ? '' : '@' + scale + 'x') + '.png', await pngBlob(scale));
+  }
+  // A recipe is the state minus derived fields.
+  const recipeOf = st => { const r = Object.assign({}, st); delete r.glow; return r; };
+  const jsonBlob = data => new Blob([JSON.stringify(data, null, 2) + '\n'], { type: 'application/json' });
   document.getElementById('save64').addEventListener('click', () => save(1));
   document.getElementById('save512').addEventListener('click', () => save(8));
   document.getElementById('copyRecipe').addEventListener('click', () => {
-    const text = JSON.stringify(state);
+    const text = JSON.stringify(recipeOf(state));
     if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(text).then(() => say('Recipe copied: paste it into your game data.'), () => say('Copy blocked here. Recipe: ' + text));
     } else say('Recipe: ' + text);
+  });
+
+  // ---- templates: import / export ----
+  const RECIPE_KEYS = Object.keys(RIG.OPTIONS).concat(['skin', 'hairColor', 'eyeColor', 'outfitColor', 'accentColor', 'blush', 'seed', 'world', 'sex']);
+  // Only known fields with primitive values are read; everything else is ignored. Missing parts
+  // come from the seed, and fit() snaps any value the world or gender doesn't allow to a valid one.
+  function cleanRecipe(o) {
+    if (!o || typeof o !== 'object' || Array.isArray(o)) return null;
+    const known = RECIPE_KEYS.filter(k => Object.prototype.hasOwnProperty.call(o, k));
+    if (!known.length) return null;
+    const seed = Number.isInteger(o.seed) && o.seed >= 0 ? o.seed : Math.floor(Math.random() * 900000) + 100000;
+    const w = Object.prototype.hasOwnProperty.call(RIG.WORLDS, o.world) ? o.world : world;
+    const sx = o.sex === 'masc' || o.sex === 'fem' ? o.sex : (rollSex === 'either' ? 'either' : rollSex);
+    const st = RIG.randomState(seed, w, sx);
+    known.forEach(k => {
+      if (k === 'seed' || k === 'world' || k === 'sex') return;
+      const v = o[k];
+      if (typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean') st[k] = v;
+    });
+    st.blush = st.blush === true;
+    return RIG.fit(st, w, st.sex);
+  }
+  function parseTemplates(text) {
+    let data;
+    try { data = JSON.parse(text); } catch (e) { throw new Error('That is not valid JSON. Check for a missing comma or quote.'); }
+    const isPack = data && typeof data === 'object' && !Array.isArray(data) && Array.isArray(data.characters);
+    const raw = Array.isArray(data) ? data : isPack ? data.characters : [data];
+    const list = raw.slice(0, 48).map(cleanRecipe).filter(Boolean);
+    if (!list.length) throw new Error('No character recipes found. A recipe needs at least one part, like "hairStyle".');
+    const name = isPack && typeof data.name === 'string' ? data.name.slice(0, 60) : '';
+    return { list, name, skipped: raw.length - list.length, capped: raw.length > 48 };
+  }
+  function importText(text) {
+    let res;
+    try { res = parseTemplates(text); } catch (e) { say(e.message); return false; }
+    const { list, name, skipped, capped } = res;
+    if (list.length > 1) {
+      rosterImported = true;
+      renderRoster(list, 'Imported ' + list.length + ' characters' + (name ? ' from "' + name + '"' : '') + '. Click one to load it, or roll a new crew.');
+    }
+    const extra = (skipped ? ' Skipped ' + skipped + ' that were not recipes.' : '') + (capped ? ' Only the first 48 were imported.' : '');
+    loadCharacter(list[0], (list.length === 1 ? 'Imported 1 character.' : 'Imported ' + list.length + ' characters; the first is in the editor.') + extra);
+    return true;
+  }
+  const tplFile = document.getElementById('tplFile');
+  tplFile.addEventListener('change', () => {
+    const f = tplFile.files[0];
+    tplFile.value = '';
+    if (!f) return;
+    if (f.size > 1024 * 1024) { say('That file is over 1 MB, which is too big for a recipe file.'); return; }
+    const reader = new FileReader();
+    reader.onload = () => importText(String(reader.result));
+    reader.onerror = () => say('Could not read that file.');
+    reader.readAsText(f);
+  });
+  document.querySelector('label[for="tplFile"]').addEventListener('keydown', e => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); tplFile.click(); }
+  });
+  const tplPaste = document.getElementById('tplPaste'), tplPasteBtn = document.getElementById('tplPasteBtn'), tplText = document.getElementById('tplText');
+  const showPaste = on => { tplPaste.hidden = !on; tplPasteBtn.setAttribute('aria-expanded', on ? 'true' : 'false'); if (on) tplText.focus(); };
+  tplPasteBtn.addEventListener('click', () => showPaste(tplPaste.hidden));
+  document.getElementById('tplCancel').addEventListener('click', () => showPaste(false));
+  document.getElementById('tplLoad').addEventListener('click', () => {
+    if (!tplText.value.trim()) { say('Paste a recipe first.'); return; }
+    if (importText(tplText.value)) { tplText.value = ''; showPaste(false); }
+  });
+  document.getElementById('tplSaveOne').addEventListener('click', () => saveBlob('character-' + state.seed + '.json', jsonBlob(recipeOf(state))));
+  document.getElementById('tplSaveCrew').addEventListener('click', () => {
+    if (!rosterStates.length) { say('The crew roster is still loading.'); return; }
+    const name = rosterImported ? 'Imported crew' : RIG.WORLDS[world].name + ' crew';
+    saveBlob('crew-' + world + '-' + rosterStates.length + '.json', jsonBlob({ name, characters: rosterStates.map(recipeOf) }));
   });
 
   document.getElementById('roll').addEventListener('click', roll);
@@ -2119,6 +2311,12 @@ if (typeof module !== 'undefined') module.exports = RIG;
   frame.addEventListener('dragover', e => { e.preventDefault(); drop.hidden = false; });
   frame.addEventListener('dragleave', () => { drop.hidden = true; });
   frame.addEventListener('drop', e => { e.preventDefault(); drop.hidden = true; loadRef(e.dataTransfer.files[0]); });
+
+  // ---- phone dock: pinned part tabs sit just under the pinned preview ----
+  const dock = document.getElementById('viewport');
+  const setDockH = () => document.documentElement.style.setProperty('--dock-h', dock.offsetHeight + 'px');
+  if (window.ResizeObserver) new ResizeObserver(setDockH).observe(dock);
+  setDockH();
 
   // ---- presentation ----
   const segBtns = Array.from(document.querySelectorAll('#sexSeg button'));

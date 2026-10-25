@@ -1,0 +1,2139 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+</head>
+<body>
+<title>Portrait Rig Lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Silkscreen&family=Rubik:wght@400;500;600&display=swap">
+<style>
+/* layout: portrait "viewport" left, tabbed part-picker right, crew roster strip below. Single committed night-sky look. */
+:root{
+  --void:#0f0d1c; --hull:#18152b; --panel:#201c38; --rim:#342e57; --rim-hi:#4a4278;
+  --star:#f3ead6; --dim:#a69fc4; --faint:#6f6893;
+  --flare:#ffb35c; --flare-ink:#2a1606; --nebula:#7f6cf0;
+  --font-display:'Silkscreen', 'Courier New', monospace;
+  --font-body:'Rubik', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  color-scheme: dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{background:var(--void)}
+body{
+  margin:0; color:var(--star); font-family:var(--font-body); font-size:14px;
+  padding-left:max(16px, env(safe-area-inset-left,0px));
+  padding-right:max(16px, env(safe-area-inset-right,0px));
+  padding-block:20px 40px;
+  background:
+    radial-gradient(1200px 600px at 80% -10%, #2a2056 0%, transparent 60%),
+    radial-gradient(900px 500px at -10% 30%, #1d1a44 0%, transparent 60%),
+    var(--void);
+  min-height:100%;
+}
+.wrap{max-width:1180px; margin:0 auto; display:flex; flex-direction:column; gap:22px;}
+header{display:flex; align-items:flex-end; justify-content:space-between; gap:16px; flex-wrap:wrap;}
+h1{font-family:var(--font-display); font-weight:400; font-size:26px; margin:0; letter-spacing:1px; line-height:1.1; text-wrap:balance;}
+h1 span{color:var(--flare);}
+.sub{color:var(--dim); margin:6px 0 0; max-width:60ch; line-height:1.45;}
+.seed{font-family:var(--font-display); font-size:11px; color:var(--faint); letter-spacing:1px;}
+
+.worlds{display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:10px;}
+@media (max-width:640px){ .worlds{grid-template-columns:minmax(0,1fr);} }
+.world{text-align:left; display:flex; flex-direction:column; gap:4px; padding:12px 14px; border-radius:12px; background:var(--hull); border:1px solid var(--rim);}
+.world b{font-family:var(--font-display); font-weight:400; font-size:13px; letter-spacing:.5px;}
+.world span{color:var(--dim); font-size:12.5px; line-height:1.4;}
+.world[aria-pressed="true"]{border-color:var(--flare); background:linear-gradient(180deg, color-mix(in srgb, var(--flare) 14%, var(--hull)), var(--hull));}
+.world[aria-pressed="true"] b{color:var(--flare);}
+:root[data-world="country"]{--flare:#f2c45a; --flare-ink:#2a1e06; --nebula:#4f8f6a;}
+:root[data-world="underpass"]{--flare:#ff4fa8; --flare-ink:#2a0618; --nebula:#2fb6c8;}
+.studio{display:grid; grid-template-columns:minmax(0, 480px) minmax(0,1fr); gap:22px; align-items:start;}
+@media (max-width:900px){ .studio{grid-template-columns:minmax(0,1fr);} .viewport{position:static;} }
+
+.viewport{position:sticky; top:max(12px, env(safe-area-inset-top,0px)); background:var(--hull); border:1px solid var(--rim); border-radius:14px; padding:16px; display:flex; flex-direction:column; gap:14px;}
+.frame{position:relative; width:100%; aspect-ratio:1; max-width:100%; border-radius:8px; overflow:hidden;
+  background: repeating-conic-gradient(#2a2546 0% 25%, #221e3c 0% 50%) 0 0/24px 24px;
+  box-shadow: inset 0 0 0 2px #0a0915, 0 0 0 1px var(--rim-hi);}
+.frame canvas{position:absolute; inset:0; width:100%; height:100%; image-rendering:pixelated;}
+.actions{display:flex; flex-wrap:wrap; gap:8px;}
+.sexbar{display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;}
+.seg{display:inline-flex; border:1px solid var(--rim-hi); border-radius:10px; overflow:hidden;}
+.seg button{border:none; border-radius:0; background:var(--panel); padding:7px 14px; font-size:13px;}
+.seg button + button{border-left:1px solid var(--rim-hi);}
+.seg button[aria-pressed="true"]{background:var(--flare); color:var(--flare-ink); font-weight:600;}
+button{font:inherit; cursor:pointer; border-radius:8px; border:1px solid var(--rim-hi); background:var(--panel); color:var(--star); padding:8px 12px; font-size:13px; font-weight:500;}
+button:hover{border-color:var(--dim);}
+button:focus-visible{outline:2px solid var(--flare); outline-offset:2px;}
+button.primary{background:var(--flare); border-color:var(--flare); color:var(--flare-ink); font-weight:600;}
+button.primary:hover{filter:brightness(1.06);}
+button[aria-pressed="true"]{border-color:var(--nebula); background:#2c2560;}
+.status{min-height:18px; font-size:12px; color:var(--dim);}
+.refbar{display:flex; flex-wrap:wrap; align-items:center; gap:10px; font-size:13px;}
+.refbar input[type=file]{font:inherit; font-size:12px; color:var(--dim); max-width:100%;}
+.refbar input[type=file]::file-selector-button{font:inherit; font-size:12px; border-radius:8px; border:1px solid var(--rim-hi); background:var(--panel); color:var(--star); padding:6px 10px; margin-right:8px; cursor:pointer;}
+.refpick{font-size:11px; text-transform:uppercase; letter-spacing:.9px; color:var(--dim); font-weight:600; width:100%;}
+.refslider{display:flex; align-items:center; gap:8px; color:var(--dim);}
+.refslider input{accent-color:var(--flare); width:120px;}
+.refnote{margin:-4px 0 0; font-size:12px; color:var(--faint); line-height:1.45;}
+.frame img{position:absolute; inset:0; width:100%; height:100%; object-fit:contain; image-rendering:pixelated; pointer-events:none;}
+.drop{position:absolute; inset:0; display:grid; place-items:center; background:rgba(15,13,28,.78); color:var(--flare); font-family:var(--font-display); font-size:13px; border:2px dashed var(--flare); border-radius:8px;}
+
+.picker{background:var(--hull); border:1px solid var(--rim); border-radius:14px; overflow:hidden; min-width:0;}
+.tabs{display:flex; gap:2px; padding:8px 8px 0; background:var(--panel); border-bottom:1px solid var(--rim); overflow-x:auto;}
+.tab{border:none; border-radius:8px 8px 0 0; background:transparent; color:var(--dim); font-family:var(--font-display); font-size:11px; letter-spacing:.5px; padding:10px 12px; white-space:nowrap;}
+.tab[aria-selected="true"]{background:var(--hull); color:var(--star);}
+.pane{padding:16px; display:flex; flex-direction:column; gap:16px;}
+.pane[hidden]{display:none;}
+.group{display:flex; flex-direction:column; gap:8px;}
+.ghead{display:flex; align-items:center; justify-content:space-between; gap:8px;}
+.glabel{font-size:11px; text-transform:uppercase; letter-spacing:.9px; color:var(--dim); font-weight:600;}
+.lock{border:none; background:transparent; padding:2px 4px; font-size:11px; color:var(--faint); font-family:var(--font-display);}
+.lock[aria-pressed="true"]{color:var(--flare); background:transparent;}
+.chips{display:flex; flex-wrap:wrap; gap:6px;}
+.chip{padding:6px 10px; font-size:12.5px; border-radius:999px; background:var(--panel); border:1px solid var(--rim); color:var(--star);}
+.chip[aria-pressed="true"]{background:var(--nebula); border-color:var(--nebula); color:#fff;}
+.swatches{display:flex; flex-wrap:wrap; gap:7px;}
+.sw{width:28px; height:28px; padding:0; border-radius:7px; border:2px solid #0a0915; box-shadow:0 0 0 1px var(--rim);}
+.sw[aria-pressed="true"]{box-shadow:0 0 0 2px var(--flare);}
+.toggle{display:flex; align-items:center; gap:8px; font-size:13px;}
+.toggle input{width:16px; height:16px; accent-color:var(--flare);}
+
+.roster{background:var(--hull); border:1px solid var(--rim); border-radius:14px; padding:16px; display:flex; flex-direction:column; gap:12px;}
+.roster-head{display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;}
+h2{font-family:var(--font-display); font-weight:400; font-size:15px; margin:0; letter-spacing:.5px;}
+.roster-head p{margin:2px 0 0; color:var(--dim); font-size:12.5px;}
+.grid{display:grid; grid-template-columns:repeat(6, minmax(0,1fr)); gap:10px;}
+@media (max-width:760px){ .grid{grid-template-columns:repeat(4, minmax(0,1fr));} }
+@media (max-width:480px){ .grid{grid-template-columns:repeat(3, minmax(0,1fr));} }
+.cell{padding:0; border-radius:8px; overflow:hidden; border:1px solid var(--rim); background:#14112a; aspect-ratio:1;}
+.cell canvas{width:100%; height:100%; display:block; image-rendering:pixelated;}
+.cell:hover{border-color:var(--flare);}
+
+.spec{background:var(--hull); border:1px solid var(--rim); border-radius:14px; padding:16px 18px;}
+.spec summary{cursor:pointer; font-family:var(--font-display); font-size:13px; list-style:none;}
+.spec summary::-webkit-details-marker{display:none}
+.spec summary::before{content:'+ '; color:var(--flare);}
+.spec[open] summary::before{content:'- ';}
+.spec-body{display:grid; grid-template-columns:minmax(0,1.1fr) minmax(0,1fr); gap:20px; margin-top:14px;}
+@media (max-width:760px){ .spec-body{grid-template-columns:minmax(0,1fr);} }
+.tablewrap{overflow-x:auto;}
+table{width:100%; border-collapse:collapse; font-size:12.5px;}
+th,td{text-align:left; padding:6px 8px; border-bottom:1px solid var(--rim); vertical-align:top;}
+th{color:var(--dim); font-size:10.5px; text-transform:uppercase; letter-spacing:.6px; font-weight:600;}
+td:first-child{font-variant-numeric:tabular-nums; color:var(--faint);}
+.note{color:var(--dim); line-height:1.55; font-size:13px; max-width:62ch;}
+.note p{margin:0 0 10px;}
+code{font-size:12px; background:var(--panel); border:1px solid var(--rim); border-radius:4px; padding:1px 5px; color:var(--star);}
+@media (prefers-reduced-motion: no-preference){ .cell{transition:border-color .15s} }
+.links{display:flex; flex-wrap:wrap; gap:6px 18px; margin-top:10px; font-size:13px;}
+.links a{color:var(--flare); text-decoration:none; border-bottom:1px solid color-mix(in srgb, var(--flare) 40%, transparent);}
+.links a:hover{border-bottom-color:var(--flare);}
+.links a:focus-visible{outline:2px solid var(--flare); outline-offset:2px;}
+</style>
+
+<div class="wrap">
+  <header>
+    <div>
+      <h1>PORTRAIT RIG <span>LAB</span></h1>
+      <p class="sub">A layered 64&times;64 pixel portrait system. Every part sits on fixed anchor bands, so any combination composites cleanly, whether you pick it by hand or roll a whole crew from a seed.</p>
+      <nav class="links" aria-label="Project">
+        <a href="https://github.com/Kain-Mercer/Pixel-Portrait-Creator" target="_blank" rel="noopener">Repository</a>
+      </nav>
+    </div>
+    <div class="seed" id="seedLabel">SEED 000000</div>
+  </header>
+
+  <nav class="worlds" aria-label="Game world" id="worlds"></nav>
+
+  <div class="studio">
+    <section class="viewport" aria-label="Portrait preview">
+      <div class="frame">
+        <canvas id="portrait" width="448" height="448" aria-label="Current portrait"></canvas>
+        <img id="refImg" alt="" hidden>
+        <canvas id="guides" width="448" height="448" aria-hidden="true"></canvas>
+        <div class="drop" id="drop" hidden>Drop a reference image</div>
+      </div>
+      <div class="sexbar" role="group" aria-label="Presentation">
+        <span class="glabel">Presentation</span>
+        <div class="seg" id="sexSeg">
+          <button data-sex="masc" aria-pressed="false">Masc</button>
+          <button data-sex="fem" aria-pressed="false">Fem</button>
+          <button data-sex="either" aria-pressed="false">Either</button>
+        </div>
+      </div>
+      <div class="actions">
+        <button class="primary" id="roll">Randomize</button>
+        <button id="guidesBtn" aria-pressed="false">Anchor guides</button>
+        <button id="save64" hidden>Save 64px PNG</button>
+        <button id="save512" hidden>Save 512px PNG</button>
+        <button id="copyRecipe">Copy recipe</button>
+      </div>
+      <div class="refbar">
+        <label class="refpick" for="refFile">Reference overlay</label>
+        <input type="file" id="refFile" accept="image/*">
+        <label class="refslider" for="refOpacity" id="refOpacityWrap" hidden>Opacity <input type="range" id="refOpacity" min="0" max="100" value="45"></label>
+        <button id="refClear" hidden>Remove</button>
+      </div>
+      <p class="refnote">Compare proportions against any portrait you own. The image stays in your browser and is never saved or uploaded.</p>
+      <div class="status" id="status" role="status"></div>
+    </section>
+
+    <section class="picker" aria-label="Parts">
+      <div class="tabs" role="tablist" id="tabs"></div>
+      <div id="panes"></div>
+    </section>
+  </div>
+
+  <section class="roster" aria-label="Crew roster">
+    <div class="roster-head">
+      <div>
+        <h2>CREW ROSTER</h2>
+        <p id="rosterNote">Twelve characters generated from seeds. Click one to load it into the editor.</p>
+      </div>
+      <button id="newRoster">Roll new crew</button>
+    </div>
+    <div class="grid" id="roster"></div>
+  </section>
+
+  <details class="spec">
+    <summary>RIG SPEC</summary>
+    <div class="spec-body">
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>Order</th><th>Layer</th><th>Anchor rows</th><th>Notes</th></tr></thead>
+          <tbody>
+            <tr><td>1</td><td>Hair, back</td><td>0&ndash;63</td><td>Falls behind neck and shoulders, one tone darker</td></tr>
+            <tr><td>2</td><td>Neck</td><td>36&ndash;58</td><td>Jaw casts a 2-tone shadow</td></tr>
+            <tr><td>3</td><td>Outfit</td><td>42&ndash;63</td><td>Neckline cut-outs reveal the neck</td></tr>
+            <tr><td>4</td><td>Ears</td><td>18&ndash;39</td><td>Behind head outline; elf tips reach row 20</td></tr>
+            <tr><td>5</td><td>Head</td><td>8&ndash;48</td><td>Face plate rows 22&ndash;40 identical for every shape</td></tr>
+            <tr><td>6</td><td>Blush, marks, stubble</td><td>22&ndash;48</td><td>Re-tint the skin ramp, keep its shading</td></tr>
+            <tr><td>7</td><td>Nose</td><td>29&ndash;37</td><td>Relative tone stamps</td></tr>
+            <tr><td>8</td><td>Mouth</td><td>38&ndash;42</td><td>Lip ramp derived from skin</td></tr>
+            <tr><td>9</td><td>Facial hair</td><td>30&ndash;53</td><td>Over the mouth, under the hair</td></tr>
+            <tr><td>10</td><td>Eyes</td><td>26&ndash;33</td><td>Centers at x 24.3 and 39.7</td></tr>
+            <tr><td>11</td><td>Brows</td><td>21&ndash;27</td><td>Tinted from the hair ramp</td></tr>
+            <tr><td>12</td><td>Hair, front</td><td>0&ndash;63</td><td>Casts a shadow onto the face first</td></tr>
+            <tr><td>13</td><td>Eyewear, headwear</td><td>0&ndash;50</td><td>Topmost</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note">
+        <p><strong>The face plate.</strong> Rows 22&ndash;40 have the same width on every head shape. Brows, eyes, nose and mouth only ever draw inside that band, so a shape swap can never push a feature off the face. Silhouette variety lives in the crown and the jaw.</p>
+        <p><strong>Ramps, not colors.</strong> Each material is a 5&ndash;7 tone ramp built in OKLCH from one base color. Shadows drift toward red or violet and highlights toward gold. Pixels store a ramp and a tone index, so recoloring a whole character is a palette swap, and shadows can be applied after the fact.</p>
+        <p><strong>Light from the upper left.</strong> Heads, necks, torsos and hair locks shade from surface normals, and front hair casts a shadow down and to the right. Use <code>Copy recipe</code> to get the JSON that reproduces a character exactly.</p>
+      </div>
+    </div>
+  </details>
+</div>
+
+<script>
+// Portrait rig engine: 64x64 layered pixel portraits with ramp-based shading.
+const RIG = (function () {
+  const N = 64, CX = 32;
+  const LIGHT = norm3([-0.5, -0.62, 0.6]);
+
+  // ---------- math ----------
+  function norm3(v) { const l = Math.hypot(v[0], v[1], v[2]) || 1; return [v[0] / l, v[1] / l, v[2] / l]; }
+  function clamp(v, a, b) { return v < a ? a : v > b ? b : v; }
+  function smooth(a, b, x) { x = clamp((x - a) / (b - a), 0, 1); return x * x * (3 - 2 * x); }
+  function lerp(a, b, t) { return a + (b - a) * t; }
+  function mulberry32(seed) {
+    let a = seed >>> 0;
+    return function () {
+      a = (a + 0x6D2B79F5) | 0;
+      let t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+  function hash2(x, y, s) {
+    let h = (x * 374761393 + y * 668265263 + (s | 0) * 2147483647) | 0;
+    h = Math.imul(h ^ (h >>> 13), 1274126177);
+    return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+  }
+
+  // ---------- color ----------
+  function hexToRgb(h) { h = h.replace('#', ''); return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)]; }
+  function rgbToHsl(r, g, b) {
+    r /= 255; g /= 255; b /= 255;
+    const mx = Math.max(r, g, b), mn = Math.min(r, g, b);
+    let h = 0, s = 0; const l = (mx + mn) / 2;
+    if (mx !== mn) {
+      const d = mx - mn;
+      s = l > 0.5 ? d / (2 - mx - mn) : d / (mx + mn);
+      if (mx === r) h = (g - b) / d + (g < b ? 6 : 0);
+      else if (mx === g) h = (b - r) / d + 2;
+      else h = (r - g) / d + 4;
+      h *= 60;
+    }
+    return [h, s, l];
+  }
+  function hslToRgb(h, s, l) {
+    h = ((h % 360) + 360) % 360 / 360;
+    if (s === 0) { const v = Math.round(l * 255); return [v, v, v]; }
+    const q = l < 0.5 ? l * (1 + s) : l + s - l * s, p = 2 * l - q;
+    const f = t => { t = (t + 1) % 1; if (t < 1 / 6) return p + (q - p) * 6 * t; if (t < 1 / 2) return q; if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6; return p; };
+    return [Math.round(f(h + 1 / 3) * 255), Math.round(f(h) * 255), Math.round(f(h - 1 / 3) * 255)];
+  }
+  function hueToward(h, target, amt) {
+    const d = ((target - h + 540) % 360) - 180;
+    const step = Math.sign(d) * Math.min(Math.abs(d), Math.abs(amt));
+    return (h + step + 360) % 360;
+  }
+  function mixRgb(a, b, t) { return [Math.round(lerp(a[0], b[0], t)), Math.round(lerp(a[1], b[1], t)), Math.round(lerp(a[2], b[2], t))]; }
+  // ---- OKLab / OKLCH ----
+  function srgbToLin(c) { c /= 255; return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); }
+  function linToSrgb(c) { const v = c <= 0.0031308 ? 12.92 * c : 1.055 * Math.pow(c, 1 / 2.4) - 0.055; return v * 255; }
+  function rgbToOklch(rgb) {
+    const [r, g, b] = rgb.map(srgbToLin);
+    const l = Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b);
+    const m = Math.cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b);
+    const s = Math.cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b);
+    const L = 0.2104542553 * l + 0.7936177850 * m - 0.0040720468 * s;
+    const A = 1.9779984951 * l - 2.4285922050 * m + 0.4505937099 * s;
+    const Bb = 0.0259040371 * l + 0.7827717662 * m - 0.8086757660 * s;
+    return [L, Math.hypot(A, Bb), (Math.atan2(Bb, A) * 180 / Math.PI + 360) % 360];
+  }
+  function oklchToRgbRaw(L, C, H) {
+    const h = H * Math.PI / 180, A = C * Math.cos(h), Bb = C * Math.sin(h);
+    const l = Math.pow(L + 0.3963377774 * A + 0.2158037573 * Bb, 3);
+    const m = Math.pow(L - 0.1055613458 * A - 0.0638541728 * Bb, 3);
+    const s = Math.pow(L - 0.0894841775 * A - 1.2914855480 * Bb, 3);
+    return [
+      linToSrgb(4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s),
+      linToSrgb(-1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s),
+      linToSrgb(-0.0041960863 * l - 0.7034186147 * m + 1.7076147010 * s),
+    ];
+  }
+  function oklchToRgb(L, C, H) {
+    let c = C;
+    for (let k = 0; k < 30; k++) {
+      const rgb = oklchToRgbRaw(L, c, H);
+      if (rgb.every(v => v >= -0.5 && v <= 255.5)) return rgb.map(v => Math.round(clamp(v, 0, 255)));
+      c *= 0.9;
+    }
+    return oklchToRgbRaw(L, 0, H).map(v => Math.round(clamp(v, 0, 255)));
+  }
+  // spec rows: [lightStep -1..1, hueShiftDeg, chromaMul]
+  function makeRamp(hex, spec, shadowHue, lightHue) {
+    const [L, C, Hh] = rgbToOklch(hexToRgb(hex));
+    return spec.map(([dl, dh, cm]) => {
+      const L2 = dl < 0 ? L + dl * (0.35 + 0.55 * L) : L + dl * (1 - L) * 1.1;
+      const H2 = dl < 0 ? hueToward(Hh, shadowHue, dh) : hueToward(Hh, lightHue, dh);
+      let C2 = C * cm;
+      if (dl < -0.5) C2 = Math.min(C2, 0.09);
+      return oklchToRgb(clamp(L2, 0.12, 0.985), C2, H2);
+    });
+  }
+  function mixRamp(ra, rb, t) { return ra.map((c, i) => mixRgb(c, rb[Math.min(i, rb.length - 1)], t)); }
+
+  const SKIN_SPEC = [[-0.5, 18, 1.1], [-0.3, 14, 1.25], [-0.14, 8, 1.2], [0, 0, 1], [0.2, 4, 0.9], [0.42, 7, 0.75]];
+  const HAIR_SPEC = [[-0.7, 30, 0.95], [-0.5, 24, 1.05], [-0.32, 16, 1.08], [-0.2, 9, 1.05], [0, 0, 1], [0.25, 8, 0.92], [0.55, 14, 0.7]];
+  const CLOTH_SPEC = [[-0.6, 26, 0.95], [-0.4, 20, 1.08], [-0.24, 12, 1.06], [0, 0, 1], [0.22, 6, 0.92], [0.45, 10, 0.78]];
+  const IRIS_SPEC = [[-0.82, 20, 0.9], [-0.42, 12, 1.1], [0, 0, 1.1], [0.2, 8, 1.1], [0.42, 14, 0.9]];
+  const METAL_SPEC = [[-0.8, 20, 1], [-0.45, 14, 1.05], [-0.18, 6, 1.05], [0, 0, 1], [0.4, 10, 0.85], [0.8, 14, 0.45]];
+
+  // ---------- palettes ----------
+  const PALETTE = {
+    skin: ['#f6d5bd', '#eab894', '#d39a72', '#b87a52', '#9a5e3c', '#77452c', '#5c3524', '#b9a7d6', '#9fd1b8'],
+    hair: ['#2a2224', '#4b3022', '#7a4a2c', '#b5652f', '#d8a656', '#efdca6', '#c6c3cf', '#d36f8f', '#7a5ac8', '#3f8fb0', '#4fae8f', '#c43a3a'],
+    eye: ['#5a3a28', '#8a5a32', '#3f78c0', '#4f9a5e', '#7f97a6', '#9b6ad4', '#d09a34', '#d0587a', '#38a8a0'],
+    cloth: ['#3b4a6b', '#7d3b3b', '#3f6b4c', '#c9a35a', '#e9e2d3', '#2c2c34', '#6b4fa0', '#d9775a', '#4f8fb3'],
+    lips: { natural: null, rose: '#d0607a', berry: '#8e2f55', coral: '#e2765c', plum: '#5a2a44' },
+  };
+
+  // ---------- buffer ----------
+  function Buffer() {
+    this.ramp = new Int16Array(N * N).fill(-1);
+    this.tone = new Int8Array(N * N);
+    this.ov = new Float32Array(N * N * 4); // overlay rgba
+    this.ramps = [];
+  }
+  Buffer.prototype.reg = function (r) { this.ramps.push(r); return this.ramps.length - 1; };
+  Buffer.prototype.put = function (x, y, rid, tone) {
+    if (x < 0 || y < 0 || x >= N || y >= N) return;
+    const i = y * N + x;
+    this.ramp[i] = rid;
+    this.tone[i] = clamp(Math.round(tone), 0, this.ramps[rid].length - 1);
+  };
+  Buffer.prototype.shift = function (x, y, d, onlyRid) {
+    if (x < 0 || y < 0 || x >= N || y >= N) return;
+    const i = y * N + x, r = this.ramp[i];
+    if (r < 0) return;
+    if (onlyRid !== undefined && !onlyRid.includes(r)) return;
+    this.tone[i] = clamp(this.tone[i] + d, 0, this.ramps[r].length - 1);
+  };
+  Buffer.prototype.retint = function (x, y, fromRids, toRid) {
+    if (x < 0 || y < 0 || x >= N || y >= N) return;
+    const i = y * N + x;
+    if (fromRids.includes(this.ramp[i])) this.ramp[i] = toRid;
+  };
+  Buffer.prototype.overlay = function (x, y, rgb, a) {
+    if (x < 0 || y < 0 || x >= N || y >= N) return;
+    const i = (y * N + x) * 4;
+    const ex = this.ov[i + 3];
+    const na = a + ex * (1 - a);
+    if (na <= 0) return;
+    for (let k = 0; k < 3; k++) this.ov[i + k] = (rgb[k] * a + this.ov[i + k] * ex * (1 - a)) / na;
+    this.ov[i + 3] = na;
+  };
+  Buffer.prototype.rid = function (x, y) { if (x < 0 || y < 0 || x >= N || y >= N) return -1; return this.ramp[y * N + x]; };
+  Buffer.prototype.toneAt = function (x, y) { return this.tone[y * N + x]; };
+
+  function Mask() { return new Uint8Array(N * N); }
+  function mget(m, x, y) { return x >= 0 && y >= 0 && x < N && y < N ? m[y * N + x] : 0; }
+  function edge4(m, x, y) { return mget(m, x, y) && (!mget(m, x - 1, y) || !mget(m, x + 1, y) || !mget(m, x, y - 1) || !mget(m, x, y + 1)); }
+
+  function toneFromI(I, th) { // th: thresholds ascending, returns 1..th.length+1
+    let t = 1;
+    for (let k = 0; k < th.length; k++) if (I > th[k]) t = k + 2;
+    return t;
+  }
+
+  // ---------- geometry ----------
+  function headHW(shape, y) {
+    if (y < 22) {
+      const top = shape === 'oval' ? 8.0 : shape === 'square' ? 9.2 : 8.7;
+      if (y < top) return 0;
+      const t = (22 - y) / (22 - top);
+      if (shape === 'square') return 13.5 * Math.pow(1 - Math.pow(t, 3.4), 1 / 3.4);
+      if (shape === 'heart') return 13.9 * Math.pow(1 - Math.pow(t, 2.4), 1 / 2.4) - 0.4 * (1 - t);
+      return 13.5 * Math.sqrt(1 - t * t);
+    }
+    if (y <= 40) return 13.5 - 1.5 * smooth(27, 40, y);
+    const j = y - 40;
+    // jaw tapers from the face plate to a rounded chin of half-width `chin`, closing over the last 2.2 rows
+    const JAW = { round: [7.6, 5.2, 2.2, 0.75], oval: [8.0, 4.2, 1.7, 0.95], heart: [8.2, 3.6, 1.35, 1.1] }[shape];
+    if (JAW) {
+      const [L, chin, p, q] = JAW, body = L - 2.2;
+      if (j > L) return 0;
+      if (j > body) return chin * Math.sqrt(Math.max(0, 1 - ((j - body) / 2.2) ** 2));
+      return chin + (12 - chin) * Math.pow(Math.max(0, 1 - Math.pow(j / body, p)), q);
+    }
+    const L = 6.8; if (j > L) return 0; return 12 * Math.pow(1 - Math.pow(j / L, 5), 0.45) - (j > 3 ? (j - 3) * 0.35 : 0);
+  }
+  function headMask(shape) {
+    const m = Mask();
+    for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+      if (Math.abs(x + 0.5 - CX) <= headHW(shape, y + 0.5)) m[y * N + x] = 1;
+    }
+    return m;
+  }
+
+  function cubic(p, t) {
+    const u = 1 - t;
+    return [
+      u * u * u * p[0][0] + 3 * u * u * t * p[1][0] + 3 * u * t * t * p[2][0] + t * t * t * p[3][0],
+      u * u * u * p[0][1] + 3 * u * u * t * p[1][1] + 3 * u * t * t * p[2][1] + t * t * t * p[3][1],
+    ];
+  }
+  // Rasterize a tapered stroke along a cubic; cb(x,y,t,s,tx,ty) with s in -1..1 across the stroke.
+  function rasterStroke(pts, wfn, cb) {
+    const M = 56, P = [];
+    for (let k = 0; k <= M; k++) P.push(cubic(pts, k / M));
+    let minx = 1e9, miny = 1e9, maxx = -1e9, maxy = -1e9, wmax = 0;
+    for (let k = 0; k <= M; k++) { minx = Math.min(minx, P[k][0]); maxx = Math.max(maxx, P[k][0]); miny = Math.min(miny, P[k][1]); maxy = Math.max(maxy, P[k][1]); wmax = Math.max(wmax, wfn(k / M)); }
+    const x0 = Math.max(0, Math.floor(minx - wmax - 1)), x1 = Math.min(N - 1, Math.ceil(maxx + wmax + 1));
+    const y0 = Math.max(0, Math.floor(miny - wmax - 1)), y1 = Math.min(N - 1, Math.ceil(maxy + wmax + 1));
+    for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+      const px = x + 0.5, py = y + 0.5;
+      let best = 1e9, bt = 0, bs = 0, btx = 0, bty = 1;
+      for (let k = 0; k < M; k++) {
+        const ax = P[k][0], ay = P[k][1], bx = P[k + 1][0], by = P[k + 1][1];
+        const dx = bx - ax, dy = by - ay, L2 = dx * dx + dy * dy || 1e-6;
+        const tt = clamp(((px - ax) * dx + (py - ay) * dy) / L2, 0, 1);
+        const qx = ax + dx * tt, qy = ay + dy * tt;
+        const d = Math.hypot(px - qx, py - qy);
+        if (d < best) {
+          best = d; bt = (k + tt) / M;
+          const L = Math.sqrt(L2); btx = dx / L; bty = dy / L;
+          bs = Math.sign(btx * (py - qy) - bty * (px - qx)) || 1;
+        }
+      }
+      const w = wfn(bt);
+      if (w > 0 && best <= w) cb(x, y, bt, bs * best / w, btx, bty);
+    }
+  }
+
+  // ---------- render context ----------
+  function render(state) {
+    const B = new Buffer();
+    const rnd = mulberry32(state.seed || 7);
+    const skinHex = PALETTE.skin[state.skin];
+    const R = {};
+    R.skin = B.reg(makeRamp(skinHex, SKIN_SPEC, 22, 95));
+    const skinRamp = B.ramps[R.skin];
+    R.blush = B.reg(mixRamp(skinRamp, makeRamp('#e8707a', SKIN_SPEC, 15, 80), 0.32));
+    R.hair = B.reg(makeRamp(PALETTE.hair[state.hairColor], HAIR_SPEC, 300, 100));
+    const hairRamp = B.ramps[R.hair];
+    R.hairBack = B.reg(hairRamp.map((c, i) => hairRamp[Math.max(0, i - 1)]));
+    R.stubble = B.reg(mixRamp(skinRamp, hairRamp.slice(1), 0.34));
+    R.stubbleDot = B.reg(mixRamp(skinRamp, hairRamp.slice(0), 0.62));
+    R.iris = B.reg(makeRamp(PALETTE.eye[state.eyeColor], IRIS_SPEC, 290, 100));
+    R.sclera = B.reg([[70, 52, 58], mixRgb([196, 178, 176], skinRamp[2], 0.25), mixRgb([232, 220, 214], skinRamp[3], 0.18), mixRgb([250, 244, 236], skinRamp[4], 0.1), [255, 255, 252]]);
+    R.lash = B.reg([mixRgb(skinRamp[0], hairRamp[0], 0.5), mixRgb(skinRamp[1], hairRamp[1], 0.5), mixRgb(skinRamp[2], skinRamp[1], 0.5)]);
+    const lipHex = PALETTE.lips[state.lips || 'natural'];
+    const lipBase = lipHex ? makeRamp(lipHex, SKIN_SPEC, 0, 60) : mixRamp(skinRamp, makeRamp('#c86070', SKIN_SPEC, 0, 60), 0.38);
+    R.lip = B.reg(lipBase);
+    R.cloth = B.reg(makeRamp(PALETTE.cloth[state.outfitColor], CLOTH_SPEC, 295, 100));
+    R.accent = B.reg(makeRamp(PALETTE.cloth[state.accentColor], CLOTH_SPEC, 295, 100));
+    R.gold = B.reg(makeRamp('#d9a441', METAL_SPEC, 35, 105));
+    R.steel = B.reg(makeRamp('#8c96a8', METAL_SPEC, 280, 100));
+    R.dark = B.reg(makeRamp('#2c2a33', CLOTH_SPEC, 295, 100));
+    R.white = B.reg(makeRamp('#efe9df', CLOTH_SPEC, 280, 100));
+    R.glow = B.reg(makeRamp(state.glow || (state.hairColor >= 7 ? PALETTE.hair[state.hairColor] : '#3fd6e0'), [[-0.7, 20, 1], [-0.4, 14, 1.05], [-0.15, 6, 1.05], [0, 0, 1.05], [0.3, 6, 0.9], [0.6, 10, 0.55]], 280, 100));
+    const ctx = { B, R, state, rnd };
+
+    const H = headMask(state.headShape);
+    ctx.headMask = H;
+
+    // layer order
+    const hair = HAIR[state.hairStyle] || HAIR.bald;
+    const hairBuild = buildHair(ctx, hair);
+    drawHairLayer(ctx, hairBuild.back, R.hairBack, true);
+    drawNeck(ctx);
+    drawOutfit(ctx);
+    drawEars(ctx);
+    drawHead(ctx);
+    paintFace(ctx);
+    if (state.blush) drawBlush(ctx);
+    drawMarks(ctx);
+    drawFacialHair(ctx, 'under');
+    drawNose(ctx);
+    drawMouth(ctx);
+    drawFacialHair(ctx, 'over');
+    drawEyes(ctx);
+    drawBrows(ctx);
+    if (state.marks === 'implant') drawImplant(ctx);
+    if (hairBuild.scalp) hairBuild.scalp(ctx);
+    if (state.extra === 'earrings') drawEarrings(ctx);
+    castShadow(ctx, hairBuild.front);
+    drawHairLayer(ctx, hairBuild.front, R.hair, false);
+    drawEyewear(ctx);
+    drawExtra(ctx);
+    return B;
+  }
+
+  // ---------- body ----------
+  function neckHW(state, y) {
+    const base = state.build === 'broad' ? 6.6 : 5.6;
+    return base + Math.max(0, y - 49.5) * Math.max(0, y - 49.5) * 0.42;
+  }
+  function shoulderHW(state, y) {
+    const S = state.build === 'broad' ? 31 : 27.5;
+    if (y < 48.6) return 0;
+    return S * (1 - Math.exp(-(y - 48.6) / 3.1));
+  }
+  function drawNeck(ctx) {
+    const { B, R, state } = ctx;
+    for (let y = 36; y < N; y++) for (let x = 0; x < N; x++) {
+      const dx = x + 0.5 - CX, hw = Math.min(neckHW(state, y + 0.5), 13);
+      if (Math.abs(dx) > hw || y > 58) continue;
+      const nx = dx / (hw + 1.5);
+      const I = -0.5 * nx + 0.35 * Math.sqrt(Math.max(0, 1 - nx * nx));
+      let t = toneFromI(I, [0.0, 0.3, 0.55]);
+      let shadow = 0;
+      for (let k = 1; k <= 4; k++) if (mget(ctx.headMask, x, y - k) || mget(ctx.headMask, x + 1, y - k)) shadow = Math.max(shadow, k <= 2 ? 2 : 1);
+      t -= shadow;
+      if (y >= 48 && shadow === 0) t += 1;
+      if (Math.abs(dx) > hw - 1 && y < 50) t = 0;
+      B.put(x, y, R.skin, Math.max(t, Math.abs(dx) > hw - 1 && y < 50 ? 0 : 1));
+    }
+  }
+
+  function torsoNormal(state, x, y) {
+    const S = state.build === 'broad' ? 31 : 27.5;
+    const dx = x + 0.5 - CX, ad = Math.min(Math.abs(dx), S - 0.01);
+    const topY = 48.6 - 3.1 * Math.log(1 - ad / S);
+    const dtop = y + 0.5 - topY;
+    return norm3([dx / (S + 4), -0.95 * Math.exp(-dtop / 2.4), 0.9]);
+  }
+
+  function drawOutfit(ctx) {
+    const { B, R, state } = ctx;
+    const style = state.outfit;
+    const torso = Mask();
+    for (let y = 44; y < N; y++) for (let x = 0; x < N; x++) {
+      if (Math.abs(x + 0.5 - CX) <= shoulderHW(state, y + 0.5)) torso[y * N + x] = 1;
+    }
+    const cloth = Mask(), accent = Mask();
+    const neckOpen = (x, y) => {
+      const dx = x + 0.5 - CX, py = y + 0.5;
+      if (style === 'tee') return ((dx * dx) / 52 + ((py - 50.2) * (py - 50.2)) / 13) < 1;
+      if (style === 'buttonup') return py > 48 && Math.abs(dx) < (py - 47.5) * 0.62 && py < 57;
+      if (style === 'jacket') return py > 47 && Math.abs(dx) < (py - 46.5) * 0.72;
+      if (style === 'hoodie') return ((dx * dx) / 40 + ((py - 50) * (py - 50)) / 9) < 1;
+      if (style === 'flight' || style === 'tech') return false;
+      if (style === 'sweater') return ((dx * dx) / 50 + ((py - 50.6) * (py - 50.6)) / 10) < 1;
+      return false;
+    };
+    for (let y = 44; y < N; y++) for (let x = 0; x < N; x++) {
+      const i = y * N + x;
+      if (!torso[i]) continue;
+      if (neckOpen(x, y)) continue;
+      cloth[i] = 1;
+    }
+    // style-specific added geometry (collars, hoods) that can extend beyond torso
+    const extraCloth = Mask();
+    if (style === 'flight' || style === 'tech') {
+      for (let y = 44; y < 52; y++) for (let x = 0; x < N; x++) {
+        const dx = Math.abs(x + 0.5 - CX);
+        if (dx <= neckHW(state, 49) + 1.6 && y + 0.5 > 45.2) { extraCloth[y * N + x] = 1; }
+      }
+    }
+    if (style === 'hoodie') {
+      for (let y = 42; y < 56; y++) for (let x = 0; x < N; x++) {
+        const dx = x + 0.5 - CX, py = y + 0.5;
+        const outer = (dx * dx) / 150 + ((py - 50.5) * (py - 50.5)) / 34 < 1;
+        const inner = (dx * dx) / 40 + ((py - 50) * (py - 50)) / 9 < 1;
+        if (outer && !inner && py > 44.5) extraCloth[y * N + x] = 1;
+      }
+    }
+    if (style === 'turtleneck') {
+      for (let y = 43; y < 52; y++) for (let x = 0; x < N; x++) {
+        const dx = Math.abs(x + 0.5 - CX);
+        if (dx <= neckHW(state, 47) + 1.2) extraCloth[y * N + x] = 1;
+      }
+    }
+    // base cloth shading
+    const all = Mask();
+    for (let i = 0; i < N * N; i++) all[i] = cloth[i] | extraCloth[i];
+    for (let y = 40; y < N; y++) for (let x = 0; x < N; x++) {
+      const i = y * N + x;
+      if (!all[i]) continue;
+      let n;
+      if (extraCloth[i] && !cloth[i] || style === 'turtleneck' && extraCloth[i] && y < 50 || (style === 'flight' || style === 'tech') && extraCloth[i] && y < 50) {
+        const dx = x + 0.5 - CX; n = norm3([dx / 9, -0.2, 0.8]);
+      } else n = torsoNormal(state, x, y);
+      const I = n[0] * LIGHT[0] + n[1] * LIGHT[1] + n[2] * LIGHT[2];
+      let t = toneFromI(I, [0.12, 0.38, 0.62, 0.88]);
+      let rid = R.cloth;
+      // fold creases
+      const dx = x + 0.5 - CX;
+      if (y > 56 && Math.abs(Math.abs(dx) - (17 + (y - 56) * 0.6)) < 0.6) t -= 1;
+      if (y > 59 && Math.abs(dx + 6 - (y - 59) * 0.4) < 0.5) t -= 1;
+      if (edge4(all, x, y)) t = (!mget(all, x + 1, y) || !mget(all, x, y + 1)) ? 0 : 1;
+      B.put(x, y, rid, t);
+    }
+    // per-style details
+    if (style === 'tee' || style === 'sweater') {
+      const ry = style === 'tee' ? 13 : 10, rx = style === 'tee' ? 52 : 50, cy = style === 'tee' ? 50.2 : 50.6;
+      for (let y = 44; y < N; y++) for (let x = 0; x < N; x++) {
+        const dx = x + 0.5 - CX, py = y + 0.5;
+        const e = (dx * dx) / rx + ((py - cy) * (py - cy)) / ry;
+        if (e >= 1 && e < 1.55 && mget(cloth, x, y)) B.put(x, y, R.cloth, e < 1.2 ? 1 : 2);
+      }
+      if (style === 'sweater') {
+        for (let y = 53; y < N; y++) for (let x = 0; x < N; x++) {
+          if (!mget(cloth, x, y) || edge4(cloth, x, y)) continue;
+          if ((x + (y >> 1)) % 4 === 0 && y % 2 === 0) B.shift(x, y, -1);
+        }
+      }
+    }
+    if (style === 'buttonup') {
+      for (let y = 47; y < 58; y++) for (let x = 0; x < N; x++) {
+        const dx = x + 0.5 - CX, ad = Math.abs(dx), py = y + 0.5;
+        const vEdge = (py - 47.5) * 0.62;
+        const inFlap = ad >= vEdge - 0.2 && ad <= vEdge + 4.2 - (py - 48) * 0.45 && py < 55.5 && py > 47.5;
+        if (inFlap) {
+          const out = ad <= vEdge + 0.6 || ad >= vEdge + 3.4 - (py - 48) * 0.45 || py > 54.6;
+          B.put(x, y, R.white, out ? 0 : (dx < 0 ? 4 : 3));
+        }
+      }
+      for (let y = 57; y < N; y++) { B.put(31, y, R.cloth, 1); B.put(32, y, R.cloth, 2); }
+      [58, 62].forEach(y => B.put(32, y, R.white, 4));
+    }
+    if (style === 'jacket') {
+      for (let y = 46; y < N; y++) for (let x = 0; x < N; x++) {
+        const dx = x + 0.5 - CX, ad = Math.abs(dx), py = y + 0.5;
+        const v = (py - 46.5) * 0.72;
+        if (ad < v && torso[y * N + x]) {
+          // inner shirt
+          const n = torsoNormal(state, x, y);
+          const I = n[0] * LIGHT[0] + n[1] * LIGHT[1] + n[2] * LIGHT[2];
+          let t = toneFromI(I, [0.15, 0.4, 0.65]);
+          if (py < 50.5 && ad < 5.5) continue;
+          B.put(x, y, R.accent, ad > v - 1.2 ? 1 : t);
+        }
+        if (ad >= v && ad < v + 3.2 && py > 47 && py < 60 && torso[y * N + x]) {
+          B.put(x, y, R.cloth, ad < v + 1 ? 0 : ad > v + 2.4 ? 1 : (dx < 0 ? 4 : 3));
+        }
+      }
+    }
+    if (style === 'hoodie') {
+      for (let y = 51; y < 61; y++) {
+        [[29.5, -0.25], [34.5, 0.25]].forEach(([sx, sl]) => {
+          const x = Math.round(sx + (y - 51) * sl - 0.5);
+          if (y < 59) B.put(x, y, R.white, 3);
+          else B.put(x, y, R.gold, 3);
+        });
+      }
+      // pocket line hint
+      for (let x = 20; x < 44; x++) B.shift(x, 62, -1);
+    }
+    if (style === 'flight') {
+      // shoulder stripe
+      for (let y = 46; y < N; y++) for (let x = 0; x < N; x++) {
+        if (!mget(cloth, x, y)) continue;
+        const dx = x + 0.5 - CX, ad = Math.min(Math.abs(dx), (state.build === 'broad' ? 31 : 27.5) - 0.01);
+        const S = state.build === 'broad' ? 31 : 27.5;
+        const topY = 48.6 - 3.1 * Math.log(1 - ad / S);
+        const d = y + 0.5 - topY;
+        if (d > 2.2 && d < 4.4 && Math.abs(dx) > 10) {
+          const n = torsoNormal(state, x, y);
+          const I = n[0] * LIGHT[0] + n[1] * LIGHT[1] + n[2] * LIGHT[2];
+          B.put(x, y, R.accent, edge4(cloth, x, y) ? 0 : toneFromI(I, [0.15, 0.4, 0.65]) + (d < 2.8 || d > 3.9 ? -1 : 0));
+        }
+      }
+      // collar seam + zipper
+      for (let y = 45; y < N; y++) {
+        const x = Math.round(CX + 2 + (y - 45) * 0.22 - 0.5);
+        B.put(x, y, R.steel, y % 2 ? 2 : 4);
+        B.put(x + 1, y, R.cloth, 1);
+      }
+      for (let x = 0; x < N; x++) { if (mget(extraCloth, x, 50) && mget(cloth, x, 51)) B.put(x, 50, R.cloth, 1); }
+      // badge
+      const bx = 41.5, by = 57.5;
+      for (let y = 54; y < 62; y++) for (let x = 37; x < 47; x++) {
+        const d = Math.hypot(x + 0.5 - bx, y + 0.5 - by);
+        if (d < 3.2) B.put(x, y, R.gold, d > 2.4 ? 1 : (x + y < bx + by - 1 ? 4 : 3));
+      }
+      B.put(41, 56, R.white, 4); B.put(40, 57, R.white, 4); B.put(42, 57, R.white, 4); B.put(41, 57, R.white, 4); B.put(41, 58, R.white, 3);
+    }
+    if (style === 'tech') {
+      // diagonal zip from the collar to the left hip, LED piping along the collar and shoulders
+      for (let y = 45; y < N; y++) {
+        const x = Math.round(CX + 3 - (y - 45) * 0.55 - 0.5);
+        B.put(x, y, R.dark, 1); B.put(x + 1, y, R.steel, y % 2 ? 2 : 4);
+      }
+      for (let x = 0; x < N; x++) if (mget(extraCloth, x, 50) && mget(cloth, x, 51)) B.put(x, 50, R.glow, 3);
+      for (let y = 46; y < N; y++) for (let x = 0; x < N; x++) {
+        if (!mget(cloth, x, y)) continue;
+        const dx = x + 0.5 - CX, S = state.build === 'broad' ? 31 : 27.5;
+        const ad = Math.min(Math.abs(dx), S - 0.01);
+        const d = y + 0.5 - (48.6 - 3.1 * Math.log(1 - ad / S));
+        if (Math.abs(d - 3.2) < 0.5 && Math.abs(dx) > 11) B.put(x, y, R.glow, dx < 0 ? 4 : 3);
+      }
+      // chest panel seam
+      for (let y = 55; y < N; y++) B.shift(Math.round(CX + 10 + (y - 55) * 0.3), y, -1);
+    }
+    if (style === 'turtleneck') {
+      for (let y = 44; y < 52; y++) for (let x = 0; x < N; x++) {
+        if (!mget(extraCloth, x, y)) continue;
+        if (y % 2 === 0 && !edge4(all, x, y)) B.shift(x, y, -1);
+      }
+    }
+  }
+
+  // ---------- ears + head ----------
+  function earMask(ctx, side) {
+    const m = Mask();
+    const ex = CX + side * 14.3, ey = 30.6;
+    const elf = ctx.state.ears === 'pointed';
+    const tri = (px, py, a, b, c) => {
+      const s = (p, q, r) => (p[0] - r[0]) * (q[1] - r[1]) - (q[0] - r[0]) * (p[1] - r[1]);
+      const p = [px, py], d1 = s(p, a, b), d2 = s(p, b, c), d3 = s(p, c, a);
+      return !((d1 < 0 || d2 < 0 || d3 < 0) && (d1 > 0 || d2 > 0 || d3 > 0));
+    };
+    for (let y = 18; y < 40; y++) for (let x = 0; x < N; x++) {
+      const px = x + 0.5, py = y + 0.5;
+      let inside = ((px - ex) * (px - ex)) / (2.8 * 2.8) + ((py - ey) * (py - ey)) / (4.4 * 4.4) < 1;
+      if (elf) inside = inside || tri(px, py, [CX + side * 13.2, 27.5], [CX + side * 20.5, 20.5], [CX + side * 15.8, 31]);
+      if (ctx.state.ears === 'small') inside = ((px - ex + side * 0.4) ** 2) / (2.2 * 2.2) + ((py - ey - 0.4) ** 2) / (3.6 * 3.6) < 1;
+      if (inside) m[y * N + x] = 1;
+    }
+    return m;
+  }
+  function drawEars(ctx) {
+    const { B, R } = ctx;
+    [-1, 1].forEach(side => {
+      const m = earMask(ctx, side);
+      const ex = CX + side * 14.3;
+      for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+        if (!m[y * N + x]) continue;
+        const px = x + 0.5, py = y + 0.5;
+        let t = side < 0 ? 3 : 2;
+        if (py < 28 && side < 0) t = 4;
+        const innerDx = (px - (ex - side * 0.6)), innerDy = py - 31;
+        if ((innerDx * innerDx) / 1.4 + (innerDy * innerDy) / 5.5 < 1) t -= side < 0 ? 1 : 1;
+        if (py > 33.5 && Math.abs(innerDx) < 1.2) t = side < 0 ? 3 : 2;
+        if (edge4(m, x, y)) t = 0;
+        B.put(x, y, R.skin, t);
+      }
+    });
+  }
+  function drawHead(ctx) {
+    const { B, R, state } = ctx;
+    const H = ctx.headMask;
+    for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+      if (!H[y * N + x]) continue;
+      const px = x + 0.5, py = y + 0.5;
+      const hw = Math.max(headHW(state.headShape, py), 1);
+      let nx = (px - CX) / (hw + 2.5);
+      let ny = (py - 25) / 25;
+      if (py > 40) ny += (py - 40) / 9;
+      const nz = Math.sqrt(Math.max(0.04, 1 - nx * nx * 0.9));
+      const n = norm3([nx * 1.1, ny * 0.8, nz]);
+      let I = n[0] * LIGHT[0] + n[1] * LIGHT[1] + n[2] * LIGHT[2];
+      if (py > 30 && py < 35 && px < CX - 5 && px > CX - 11) I += 0.07;
+      let t = toneFromI(I, [-0.2, 0.12, 0.7]);
+      if (edge4(H, x, y)) t = (!mget(H, x + 1, y) || !mget(H, x, y + 1)) ? 0 : 1;
+      B.put(x, y, R.skin, t);
+    }
+  }
+  function paintFace(ctx) {
+    const { B, R } = ctx;
+    const S = [R.skin];
+    // inner eye corners / nose bridge shading
+    for (let y = 27; y <= 31; y++) { B.shift(CX + 3, y, -1, S); if (y > 28) B.shift(CX - 4, y, -1, S); }
+    // brow ridge shadow on shadow side
+    for (let x = CX + 4; x <= CX + 11; x++) B.shift(x, 27, -1, S);
+    // under-chin core shadow along jaw on right
+    // temple shade
+    for (let y = 22; y <= 26; y++) B.shift(CX + 12, y, -1, S);
+  }
+  function drawBlush(ctx) {
+    const { B, R } = ctx;
+    [-1, 1].forEach(side => {
+      const bx = CX + side * 8.6, by = 34.6;
+      for (let y = 32; y < 38; y++) for (let x = 0; x < N; x++) {
+        const d = ((x + 0.5 - bx) ** 2) / 7.5 + ((y + 0.5 - by) ** 2) / 1.6;
+        if (d < 1 || (d < 1.7 && (x + y) % 2 === 0)) B.retint(x, y, [R.skin], R.blush);
+      }
+    });
+  }
+
+  // ---------- face features ----------
+  // Eye params: ew/eh half-size, lower = lower-lid curve ratio, tilt = outer-corner lift,
+  // ir = iris radius as fraction of eye height (>1 means the lid clips it), inset = iris shift toward nose.
+  const EYES = {
+    round:  { ew: 3.3, eh: 2.15, lower: 0.9, tilt: 0.2, ir: 1.38, inset: 0.15, lid: 0, flick: 1, lowerLash: false },
+    almond: { ew: 3.6, eh: 1.8, lower: 0.75, tilt: 0.8, ir: 1.45, inset: 0.2, lid: 0, flick: 2, lowerLash: true },
+    sleepy: { ew: 3.4, eh: 2.1, lower: 0.7, tilt: 0.0, ir: 1.3, inset: 0.15, lid: 0.8, flick: 1, lowerLash: false },
+    sharp:  { ew: 3.7, eh: 1.6, lower: 0.65, tilt: 1.3, ir: 1.5, inset: 0.2, lid: 0.15, flick: 2, lowerLash: true },
+    wide:   { ew: 3.4, eh: 2.5, lower: 0.95, tilt: 0.15, ir: 1.22, inset: 0.15, lid: 0, flick: 2, lowerLash: true, sparkle: true },
+    gentle: { ew: 3.5, eh: 1.95, lower: 0.8, tilt: -0.45, ir: 1.4, inset: 0.15, lid: 0.25, flick: 1, lowerLash: false },
+    closed: { closed: true, ew: 3.3, eh: 1.3 },
+  };
+  function drawEyes(ctx) {
+    const { B, R, state } = ctx;
+    const base = EYES[state.eyeStyle] || EYES.round;
+    const masc = state.sex === 'masc';
+    const p = masc ? Object.assign({}, base, { flick: 0, lowerLash: false, mascLash: true }) : base;
+    const SK = [R.skin, R.blush, R.stubble, R.stubbleDot];
+    [-1, 1].forEach(dir => {
+      const cx = CX + dir * 7.4, cy = 30.0;
+      if (p.closed) {
+        for (let y = 26; y < 34; y++) for (let x = 0; x < N; x++) {
+          const u = (x + 0.5 - cx) / p.ew * dir;
+          if (Math.abs(u) > 1.08) continue;
+          const yy = cy + 0.6 - p.eh * (1 - u * u) * 0.85 + (u > 0 ? u * 0.3 : 0);
+          const d = Math.abs(y + 0.5 - yy);
+          if (d < 0.62) B.put(x, y, R.lash, u > 0.2 ? 0 : 1);
+          else if (d < 1.5 && y + 0.5 < yy && Math.abs(u) < 0.6) B.shift(x, y, -1, SK);
+        }
+        B.put(Math.floor(cx + dir * (p.ew + 0.6)), Math.round(cy + 0.7), R.lash, 1);
+        B.put(Math.floor(cx + dir * (p.ew + 1.4)), Math.round(cy + 1.4), R.lash, 1);
+        return;
+      }
+      const top = u => -p.eh * Math.pow(Math.max(0, 1 - u * u), 0.55) - p.tilt * u * 0.5 + p.lid * Math.max(0, 1 - u * u) * 1.1;
+      const bot = u => p.eh * p.lower * Math.pow(Math.max(0, 1 - u * u), 0.85) - p.tilt * u * 0.25;
+      const inside = (x, y) => {
+        const u = (x + 0.5 - cx) / p.ew * dir, v = y + 0.5 - cy;
+        return Math.abs(u) < 1 && v > top(u) && v < bot(u);
+      };
+      const ir = p.eh * p.ir;
+      const icx = cx - dir * p.inset, icy = cy + 0.35 + p.lid * 0.25;
+      const irx = Math.min(ir * 0.95, p.ew * 0.8);
+      for (let y = 24; y < 36; y++) for (let x = Math.floor(cx - 7); x < cx + 7; x++) {
+        if (!inside(x, y)) continue;
+        const u = (x + 0.5 - cx) / p.ew * dir;
+        const dx = (x + 0.5 - icx) / irx, dy = (y + 0.5 - icy) / ir;
+        const d = Math.hypot(dx, dy);
+        const topRow = !inside(x, y - 1), top2 = !inside(x, y - 2);
+        if (d <= 1) {
+          // iris: dark under the lid, glowing lower crescent, darker limbal rim
+          let t = dy < 0.45 ? 2 : 3;
+          if (dy > 0.55 && Math.abs(dx) < 0.45) t = 4;
+          if (d > 0.84 && dy < 0.4) t = Math.max(1, t - 1);
+          if (topRow) t = 1;
+          B.put(x, y, R.iris, t);
+        } else {
+          let t = topRow ? 2 : 3;
+          if (Math.abs(u) > 0.78) t = 2;
+          B.put(x, y, R.sclera, t);
+          if (u < -0.82 && !topRow) B.put(x, y, R.lip, 4);
+        }
+      }
+      // pupil: 2x2 block (1 row on narrow eyes), catchlight on its top-left pixel
+      const pxs = Math.round(icx) - 1, pys = Math.round(icy - 0.2) - (p.eh >= 1.9 ? 1 : 0);
+      const prow = p.eh >= 1.9 ? 2 : 1;
+      for (let oy = 0; oy < prow; oy++) for (let ox = 0; ox < 2; ox++) {
+        const x = pxs + ox, y = pys + oy;
+        if (inside(x, y) && B.rid(x, y) === R.iris) B.put(x, y, R.iris, 0);
+      }
+      if (inside(pxs, pys)) B.put(pxs, pys, R.sclera, 4);
+      else if (inside(pxs, pys + 1)) B.put(pxs, pys + 1, R.sclera, 4);
+      const sx = Math.floor(icx + irx * 0.4), sy = Math.floor(icy + ir * 0.35);
+      if (p.sparkle && inside(sx, sy)) B.put(sx, sy, R.sclera, 4);
+      // upper lid line (2px, thickening outward), lid crease, lower lid
+      for (let y = 22; y < 36; y++) for (let x = Math.floor(cx - 7); x < cx + 7; x++) {
+        if (inside(x, y)) continue;
+        const u = (x + 0.5 - cx) / p.ew * dir;
+        if (inside(x, y + 1)) {
+          B.put(x, y, R.lash, u > -0.2 ? 0 : 1);
+          if (p.mascLash ? u > 0.3 : u > -0.55) B.put(x, y - 1, R.lash, u > 0.45 ? 0 : 1);
+          if (u > -0.5 && u < 0.75) {
+            B.shift(x, y - 3, -1, SK);
+            if (u < 0.1) B.shift(x, y - 2, +1, SK);
+          }
+        } else if (inside(x, y - 1)) {
+          if (p.lowerLash && u > 0.45) B.put(x, y, R.lash, 1);
+          else if (u > -0.5) B.put(x, y, R.lash, 2);
+        } else if (inside(x - 1, y) || inside(x + 1, y)) {
+          B.put(x, y, R.lash, u > 0 ? 0 : 2);
+        }
+      }
+      // outer lashes
+      const ox = cx + dir * p.ew, oy = cy + top(0.97);
+      for (let k = 1; k <= p.flick; k++) B.put(Math.floor(ox + dir * (k - 0.3)), Math.floor(oy - k * 0.6 + 0.2), R.lash, 0);
+    });
+  }
+
+  const BROWS = {
+    soft:     { t0: 1.5, t1: 1.0, arch: 0.9, inD: 0.2, outD: 0.6 },
+    straight: { t0: 2.2, t1: 1.5, arch: 0.1, inD: 0.0, outD: 0.3 },
+    arched:   { t0: 1.8, t1: 1.0, arch: 1.9, inD: 0.4, outD: 0.9 },
+    fierce:   { t0: 2.2, t1: 1.3, arch: 0.4, inD: 1.2, outD: -1.2 },
+    worried:  { t0: 1.7, t1: 1.1, arch: 0.6, inD: -1.1, outD: 0.9 },
+    bushy:    { t0: 2.9, t1: 2.2, arch: 0.6, inD: 0.0, outD: 0.4 },
+  };
+  function drawBrows(ctx) {
+    const { B, R, state } = ctx;
+    const b0 = BROWS[state.browStyle] || BROWS.soft;
+    const p = state.sex === 'masc' ? Object.assign({}, b0, { t0: b0.t0 + 0.45, t1: b0.t1 + 0.35, arch: b0.arch * 0.7 }) : b0;
+    [-1, 1].forEach(dir => {
+      const a = [CX + dir * 3.6, 25.8 + p.inD], c = [CX + dir * 11.0, 26.1 + p.outD];
+      const b = [CX + dir * 7.9, 24.2 - p.arch];
+      const pts = [a, [lerp(a[0], b[0], 0.66), lerp(a[1], b[1], 0.66)], [lerp(c[0], b[0], 0.66), lerp(c[1], b[1], 0.66)], c];
+      const m = Mask();
+      rasterStroke(pts, t => (lerp(p.t0, p.t1, t) * (t > 0.85 ? Math.max(0.35, (1 - t) / 0.15) : 1)) / 2 + 0.12, (x, y, t, s) => { m[y * N + x] = 1 + Math.round(t * 10); });
+      for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+        const v = m[y * N + x];
+        if (!v) continue;
+        const t = (v - 1) / 10;
+        let tone = 1;
+        if (!mget(m, x, y - 1) && t < 0.7) tone = 2;
+        if (t < 0.12) tone = 3;
+        if (!mget(m, x, y + 1) && t > 0.3) tone = 0;
+        B.put(x, y, R.hair, tone);
+      }
+    });
+  }
+
+  // nose stamps: rows from y0, cols dx -3..3; '.' none, ',' -1, ':' -2, '+' +1, 'o' tone 0
+  const NOSES = {
+    button:  { y0: 31, rows: ['.......', '....,..', '....,..', '....,..', '.+..,,.', '..:.:..'] },
+    straight:{ y0: 29, rows: ['....,..', '....,..', '....,..', '....,..', '....,..', '.+..,,.', '.:..::.'] },
+    snub:    { y0: 32, rows: ['.......', '....,..', '.++.,..', '.,:.:,.'] },
+    hooked:  { y0: 29, rows: ['....,..', '....,..', '....,,.', '.....,.', '.+...,.', '..:,,:.', '.......'] },
+    wide:    { y0: 31, rows: ['.......', '....,..', '....,..', '+...,,.', ':,..,.:', '.:,,,:.'] },
+    soft:    { y0: 33, rows: ['....,..', '.+.,,..', '..,....'] },
+  };
+  function applyStamp(ctx, x0, y0, rows, map) {
+    const { B } = ctx;
+    rows.forEach((row, j) => {
+      for (let i = 0; i < row.length; i++) {
+        const ch = row[i];
+        if (ch === '.' || ch === ' ') continue;
+        const fn = map[ch];
+        if (fn) fn(x0 + i, y0 + j);
+      }
+    });
+  }
+  function drawNose(ctx) {
+    const { B, R, state } = ctx;
+    const st = NOSES[state.noseStyle] || NOSES.button;
+    const S = [R.skin, R.blush, R.stubble, R.stubbleDot];
+    applyStamp(ctx, CX - 3, st.y0, st.rows, {
+      ',': (x, y) => B.shift(x, y, -1, S),
+      ':': (x, y) => B.shift(x, y, -2, S),
+      '+': (x, y) => B.shift(x, y, +1, S),
+      'o': (x, y) => B.put(x, y, R.skin, 0),
+    });
+  }
+
+  // mouth stamps: cols dx -4..4
+  const MOUTHS = {
+    smile:   { y0: 38, rows: ['.l.....l.', '..LLLLL..', '...ppp...', '...sss...'] },
+    neutral: { y0: 39, rows: ['..lLLLl..', '...ppp...', '...sss...'] },
+    grin:    { y0: 38, rows: ['.l.....l.', '.LtttttL.', '..LdddL..', '...ppp...', '...sss...'] },
+    smirk:   { y0: 38, rows: ['.......l.', '..lLLLL..', '...pp....', '...ss....'] },
+    open:    { y0: 38, rows: ['...LLL...', '..LdddL..', '..LdqdL..', '...LLL...', '...sss...'] },
+    lips:    { y0: 38, rows: ['...pPp...', '..lLLLl..', '..qpPpq..', '...sss...'] },
+    frown:   { y0: 39, rows: ['...LLL...', '.lL...Ll.', '...sss...'] },
+    tongue:  { y0: 38, rows: ['.l.....l.', '..LLLLL..', '...LrL...', '...srs...'] },
+  };
+  function drawMouth(ctx) {
+    const { B, R, state } = ctx;
+    const st = MOUTHS[state.mouthStyle] || MOUTHS.smile;
+    const S = [R.skin, R.blush, R.stubble, R.stubbleDot];
+    applyStamp(ctx, CX - 4, st.y0, st.rows, {
+      'L': (x, y) => B.put(x, y, R.lip, 0),
+      'l': (x, y) => B.put(x, y, R.lip, 1),
+      'p': (x, y) => B.put(x, y, R.lip, 3),
+      'P': (x, y) => B.put(x, y, R.lip, 4),
+      'q': (x, y) => B.put(x, y, R.lip, 2),
+      't': (x, y) => B.put(x, y, R.sclera, 3),
+      'd': (x, y) => B.put(x, y, R.lip, 0),
+      'r': (x, y) => B.put(x, y, R.lip, 4),
+      's': (x, y) => B.shift(x, y, -1, S),
+    });
+  }
+
+  function drawMarks(ctx) {
+    const { B, R, state } = ctx;
+    const S = [R.skin, R.blush];
+    const m = state.marks;
+    if (m === 'freckles') {
+      const pts = [[-9, 33], [-7, 32], [-8, 34], [-6, 34], [-10, 35], [-5, 33], [-3, 32], [2, 32], [5, 33], [7, 32], [8, 34], [6, 34], [9, 35], [4, 34], [-1, 31], [1, 31]];
+      pts.forEach(([dx, y]) => B.shift(CX + dx, y, -1, S));
+    } else if (m === 'mole') {
+      B.put(CX + 6, 38, R.skin, 0);
+    } else if (m === 'scar') {
+      for (let k = 0; k < 7; k++) { const x = CX + 5 + Math.round(k * 0.6), y = 24 + k; B.shift(x, y, +1, S); B.shift(x + 1, y, -1, S); }
+    } else if (m === 'star') {
+      const sx = CX - 8, sy = 35;
+      [[0, 0, 4], [-1, 0, 2], [1, 0, 2], [0, -1, 2], [0, 1, 2]].forEach(([dx, dy, t]) => B.put(sx + dx, sy + dy, R.glow, t));
+    } else if (m === 'implant') {
+      // drawn late in drawImplant so beards and eyes never cover it
+    } else if (m === 'circuit') {
+      // glowing trace lines running from under the eye down to the jaw
+      const path = [[25, 33], [24, 34], [23, 35], [23, 36], [22, 37], [21, 38]];
+      const branch = [[23, 36], [24, 37], [25, 37]];
+      path.concat(branch).forEach(([x, y]) => B.put(x, y, R.glow, 3));
+      [[25, 33], [21, 38], [25, 37]].forEach(([x, y]) => B.put(x, y, R.glow, 5));
+    } else if (m === 'stripes') {
+      [-1, 1].forEach(dir => { for (let k = 0; k < 4; k++) { B.put(CX + dir * (9 + k), 34 + (k >> 1), R.glow, 3); B.put(CX + dir * (9 + k), 36 + (k >> 1), R.glow, 2); } });
+    }
+  }
+
+  function drawImplant(ctx) {
+    const { B, R } = ctx;
+    const cx = 42.6, cy = 35.2;
+    for (let y = 31; y < 40; y++) for (let x = 38; x < 47; x++) {
+      const px = x + 0.5, py = y + 0.5;
+      const e = (px - cx) ** 2 / 6.2 + (py - cy) ** 2 / 5.2;
+      if (e >= 1 || !mget(ctx.headMask, x, y) || edge4(ctx.headMask, x, y)) continue;
+      B.put(x, y, R.steel, e > 0.55 ? 1 : (py < cy - 0.5 ? 4 : px > cx + 0.6 ? 2 : 3));
+    }
+    B.put(42, 33, R.steel, 5);
+    B.put(43, 35, R.glow, 5); B.put(42, 35, R.glow, 3); B.put(43, 36, R.glow, 3);
+    for (let x = 45; x < 47; x++) B.put(x, 34, R.steel, 1);
+  }
+  function drawFacialHair(ctx, phase) {
+    const { B, R, state } = ctx;
+    const f = state.facialHair;
+    const H = ctx.headMask;
+    const S = [R.skin, R.blush];
+    if (phase === 'under' && (f === 'stubble' || f === 'beard' || f === 'goatee')) {
+      for (let y = 33; y < 50; y++) for (let x = 0; x < N; x++) {
+        if (!H[y * N + x] || edge4(H, x, y)) continue;
+        const dx = x + 0.5 - CX, py = y + 0.5, ad = Math.abs(dx);
+        const hw = headHW(state.headShape, py);
+        let inRegion = (py > 38.6) || (py > 36.6 && ad < 4.6) || (ad > hw - 3.2 && py > 33);
+        if (f === 'goatee') inRegion = (py > 40.5 && ad < 4.2) || (py > 37 && py < 38.6 && ad < 4.4);
+        if (!inRegion) continue;
+        B.retint(x, y, S, R.stubble);
+        if ((x * 3 + y * 5) % 4 === 0 && hash2(x, y, 3) > 0.2) B.retint(x, y, [R.stubble], R.stubbleDot);
+      }
+    }
+    if (phase === 'over') {
+      if (f === 'mustache' || f === 'beard' || f === 'goatee' || f === 'handlebar') {
+        const pts = f === 'handlebar'
+          ? [[CX - 6.8, 37.0], [CX - 3.5, 37.6], [CX - 1.5, 36.0], [CX, 36.6]]
+          : [[CX - 4.9, 39.6], [CX - 4.2, 37.6], [CX - 1.5, 36.6], [CX, 37.0]];
+        [-1, 1].forEach(dir => {
+          const P = pts.map(([x, y]) => [CX + (x - CX) * dir, y]);
+          rasterStroke(P, t => lerp(0.75, 1.25, t), (x, y, t, s) => {
+            B.put(x, y, R.hair, s * dir > 0.4 ? 0 : t < 0.3 ? 2 : 3);
+          });
+        });
+      }
+      if (f === 'beard') {
+        // volume around jaw + chin, extends below chin
+        const m = Mask();
+        for (let y = 30; y < 54; y++) for (let x = 0; x < N; x++) {
+          const dx = x + 0.5 - CX, py = y + 0.5, ad = Math.abs(dx);
+          let hw = headHW(state.headShape, Math.min(py, 46));
+          if (py > 43) hw = Math.max(headHW(state.headShape, py), 9.5 * Math.sqrt(Math.max(0, 1 - ((py - 43) / 7.4) ** 2)));
+          if (ad > hw + 0.6) continue;
+          const sideburn = ad > hw - 2.6 && py > 30.5;
+          const lower = py > 40.4 && !(((dx * dx) / 14 + ((py - 40) ** 2) / 1.6) < 1);
+          if (sideburn || lower) m[y * N + x] = 1;
+        }
+        for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+          if (!m[y * N + x]) continue;
+          const dx = x + 0.5 - CX, py = y + 0.5;
+          const n = norm3([dx / 13, (py - 40) / 12, 0.8]);
+          const I = n[0] * LIGHT[0] + n[1] * LIGHT[1] + n[2] * LIGHT[2];
+          let t = toneFromI(I, [0.1, 0.35, 0.6, 0.82]);
+          const strand = Math.sin(dx * 1.7 + py * 0.3 + hash2(x, 0, 9) * 2.0);
+          if (strand > 0.72) t -= 1;
+          if (edge4(m, x, y) && (py > 43 || !mget(ctx.headMask, x, y))) t = 0;
+          B.put(x, y, R.hair, t);
+        }
+      }
+    }
+  }
+
+  // ---------- hair system ----------
+  // A style returns {back:[prims], front:[prims], scalp?}. prims: {type:'lock', pts, w0, w1, sheen:[a,b], tone, tip}
+  //  | {type:'cap', part:[x,y], hairline(x)->y, band:[r0,r1]} | {type:'ball', c:[x,y], r, swirl} | {type:'mask', test(x,y), ...}
+  function L(pts, w0, w1, o) { return Object.assign({ type: 'lock', pts, w0, w1, sheen: [0.18, 0.38], tone: 0, tip: true }, o || {}); }
+  const SK = { cx: 32, cy: 21.4, r: 16.4 };
+
+  function fanFringe(P, n, xA, xB, yFn, opts) {
+    const out = [];
+    for (let k = 0; k < n; k++) {
+      const t = n === 1 ? 0.5 : k / (n - 1);
+      const ex = lerp(xA, xB, t);
+      const ey = yFn(ex, k);
+      const sway = (opts.sway || 0) + (k % 2 ? 0.6 : -0.6) * (opts.jitter || 0);
+      const p0 = [P[0] + (ex - P[0]) * 0.18, P[1] + 0.5];
+      const p1 = [P[0] + (ex - P[0]) * 0.75 + sway, P[1] - 1.5 - (opts.lift || 0)];
+      const p2 = [ex + (opts.curl || 0) * (ex < CX ? -1 : 1) + sway, ey - 7];
+      const p3 = [ex + sway * 0.5, ey];
+      out.push(L([p0, p1, p2, p3], opts.w0 || 3.4, opts.w1 || 1.2, { sheen: opts.sheen || [0.22, 0.42], tone: (k % 3 === 1 ? -0.4 : 0) }));
+    }
+    return out;
+  }
+  function hairlineStd(part) {
+    return x => { const ad = Math.abs(x - CX); return 17.6 + (ad > 7 ? (ad - 7) * (ad - 7) * 0.33 : 0); };
+  }
+  function cap(part, o) { return Object.assign({ type: 'cap', part, hairline: hairlineStd(part), band: [7.5, 10.5], stripes: 14 }, o || {}); }
+
+  const HAIR = {
+    bald: { name: 'Bald', build() { return { back: [], front: [] }; } },
+    buzz: {
+      name: 'Buzz cut',
+      build() {
+        return {
+          back: [], front: [],
+          scalp(ctx) {
+            const { B, R } = ctx;
+            const hl = hairlineStd([32, 8]);
+            for (let y = 0; y < 30; y++) for (let x = 0; x < N; x++) {
+              if (!mget(ctx.headMask, x, y) || edge4(ctx.headMask, x, y)) continue;
+              const ax = Math.abs(x + 0.5 - CX);
+              if (y + 0.5 > hl(x + 0.5) - 0.5 || ax > 13.2) continue;
+              B.retint(x, y, [R.skin], R.stubble);
+              if ((x + y) % 2 === 0) B.retint(x, y, [R.stubble], R.stubbleDot);
+            }
+          },
+        };
+      },
+    },
+    tousled: {
+      name: 'Tousled',
+      build() {
+        const P = [32, 8.5];
+        const front = [cap(P, { hairline: x => hairlineStd(P)(x) + 0.5 })];
+        front.push(...fanFringe(P, 7, 20.5, 43.5, (x, k) => 20.5 + [0, 2, 1, 3, 0.5, 2.5, 0][k], { w0: 3.8, w1: 1.0, jitter: 1.2, curl: 1.5 }));
+        front.push(L([[22, 10], [17, 12], [16.5, 20], [17.5, 27]], 3.2, 1.0));
+        front.push(L([[42, 10], [47, 12], [47.5, 20], [46.5, 27]], 3.2, 1.0, { tone: -0.5 }));
+        front.push(L([[30, 9], [28, 5], [25, 3.5], [22.5, 4.5]], 2.6, 0.8));
+        front.push(L([[34, 9], [37, 4.5], [41, 3.8], [43.5, 6]], 2.6, 0.8));
+        front.push(L([[27, 9], [24, 7], [19.5, 9], [18, 13]], 3.0, 1.0));
+        return { back: [L([[22, 20], [18, 26], [19, 32], [20.5, 36]], 3.2, 1.5), L([[42, 20], [46, 26], [45, 32], [43.5, 36]], 3.2, 1.5)], front };
+      },
+    },
+    sidepart: {
+      name: 'Side part',
+      build() {
+        const P = [25.5, 7.5];
+        const front = [cap(P, { band: [8, 11] })];
+        for (let k = 0; k < 6; k++) {
+          const ey = 17 + k * 1.3, ex = 36 + k * 2.2;
+          front.push(L([[P[0] + 1, P[1] + 0.5 + k * 0.3], [31 + k, 3 + k * 0.4], [ex - 2, ey - 6], [ex, ey + 1.5]], 3.6, 1.6, { tone: k % 2 ? -0.4 : 0, sheen: [0.25, 0.45] }));
+        }
+        front.push(L([[P[0] + 1.5, 9], [29, 13], [34, 18], [37.5, 20]], 3.6, 1.0, { sheen: [0.3, 0.5] }));
+        front.push(L([[P[0], P[1]], [22, 8], [18.5, 13], [17.6, 22]], 3.2, 1.2, { tone: 0.2 }));
+        front.push(L([[P[0], P[1] + 1], [21, 11], [18.5, 17], [18.5, 26]], 2.6, 1.0));
+        front.push(L([[44, 12], [47, 15], [47.5, 21], [46.6, 27]], 3.0, 1.0, { tone: -0.5 }));
+        return { back: [], front };
+      },
+    },
+    spiky: {
+      name: 'Spiky',
+      build() {
+        const P = [32, 9];
+        const front = [cap(P, { band: [7, 10] })];
+        const spikes = [[-160, 15], [-140, 17], [-118, 18], [-95, 17], [-72, 18], [-50, 17], [-28, 15], [-10, 12], [-175, 12]];
+        spikes.forEach(([a, len], k) => {
+          const r = a * Math.PI / 180;
+          const ex = P[0] + Math.cos(r) * len, ey = P[1] + 3 + Math.sin(r) * len * 0.75;
+          front.push(L([[P[0] + Math.cos(r) * 3, P[1] + 4], [P[0] + Math.cos(r) * 7, P[1] + 2 + Math.sin(r) * 6], [ex - Math.cos(r) * 4, ey + 2], [ex, ey]], 4.4, 0.4, { tone: k % 2 ? -0.5 : 0.2, sheen: [0.3, 0.5] }));
+        });
+        front.push(...fanFringe(P, 5, 22, 42, (x, k) => 21 + [1, 3, 0, 2.5, 1][k], { w0: 3.6, w1: 0.4, jitter: 2, curl: -1 }));
+        return { back: [], front };
+      },
+    },
+    undercut: {
+      name: 'Undercut',
+      build() {
+        const P = [24, 7];
+        const front = [];
+        for (let k = 0; k < 7; k++) {
+          const ex = 36 + k * 1.7, ey = 13 + k * 1.6;
+          front.push(L([[22 + k * 0.6, 12 - k * 0.2], [24 + k, 0.5 + k * 0.3], [ex + 4, 1 + k], [ex + 2.5, ey + 2]], 4.2, 1.3, { tone: k % 2 ? -0.4 : 0.1, sheen: [0.25, 0.45] }));
+        }
+        front.push(L([[28, 6], [36, 3], [40, 11], [38.5, 22]], 4.0, 0.8, { sheen: [0.2, 0.42] }));
+        front.push(L([[30, 7], [38, 6], [43, 14], [42, 24]], 3.4, 0.8, { tone: -0.3 }));
+        return {
+          back: [], front,
+          scalp(ctx) {
+            const { B, R } = ctx;
+            for (let y = 6; y < 30; y++) for (let x = 0; x < N; x++) {
+              const px = x + 0.5;
+              if (!mget(ctx.headMask, x, y) || edge4(ctx.headMask, x, y)) continue;
+              const ad = Math.abs(px - CX);
+              if (y + 0.5 > 17.6 + (ad > 7 ? (ad - 7) ** 2 * 0.33 : 0)) continue;
+              B.retint(x, y, [R.skin], R.stubble);
+              if ((x + y) % 2 === 0) B.retint(x, y, [R.stubble], R.stubbleDot);
+            }
+          },
+        };
+      },
+    },
+    bob: {
+      name: 'Bob',
+      build() {
+        const P = [29, 7.5];
+        const front = [cap(P, { band: [8, 11] })];
+        // blunt bangs
+        for (let k = 0; k < 8; k++) {
+          const ex = 20.5 + k * 3.1;
+          front.push(L([[P[0] + (ex - P[0]) * 0.2, P[1] + 1], [P[0] + (ex - P[0]) * 0.8, P[1] - 1.5], [ex, 14], [ex + 0.3, 22.3 - (k === 0 || k === 7 ? 1 : 0)]], 2.6, 2.2, { tip: false, tone: k % 2 ? -0.35 : 0, sheen: [0.25, 0.45] }));
+        }
+        [-1, 1].forEach(d => {
+          for (let k = 0; k < 3; k++) {
+            const x0 = CX + d * (11 + k * 1.4);
+            front.push(L([[x0, 10 + k], [CX + d * (17.5 + k * 0.5), 16], [CX + d * (17.5 + k * 0.3), 34], [CX + d * (13.5 - k * 0.8), 44.5 - k * 0.6]], 3.0, 2.0, { tip: false, tone: (d > 0 ? -0.5 : 0) + (k === 1 ? -0.3 : 0), sheen: [0.08, 0.2] }));
+          }
+        });
+        const back = [];
+        [-1, 1].forEach(d => back.push(L([[CX + d * 8, 22], [CX + d * 17, 26], [CX + d * 16.5, 38], [CX + d * 12, 45]], 6, 4, { tip: false })));
+        return { back, front };
+      },
+    },
+    long: {
+      name: 'Long',
+      build() {
+        const P = [32, 7.2];
+        const front = [cap(P, { hairline: x => { const ad = Math.abs(x - CX); return 16 + (ad < 1.2 ? -8 : 0) + (ad > 6 ? (ad - 6) ** 2 * 0.3 : 0); }, band: [8, 11] })];
+        [-1, 1].forEach(d => {
+          for (let k = 0; k < 4; k++) {
+            const o = k * 1.6;
+            front.push(L([[CX + d * (1 + o * 0.4), 7.5 + k * 0.5], [CX + d * (13 + o), 7 + k], [CX + d * (17 + o * 0.4), 24], [CX + d * (15.5 + o * 0.9), 40 + k * 2]], 3.0, 2.0, { tip: false, tone: (d > 0 ? -0.5 : 0) + (k % 2 ? -0.3 : 0), sheen: [0.12, 0.24] }));
+          }
+          front.push(L([[CX + d * 15, 36], [CX + d * 16, 46], [CX + d * 18, 54], [CX + d * 17.5, 62]], 3.6, 1.0, { tone: d > 0 ? -0.5 : 0, sheen: [0.4, 0.55] }));
+          front.push(L([[CX + d * 17, 36], [CX + d * 18.5, 46], [CX + d * 20.5, 54], [CX + d * 20.5, 61]], 3.0, 0.8, { tone: d > 0 ? -0.8 : -0.3 }));
+        });
+        const back = [];
+        [-1, 1].forEach(d => {
+          back.push(L([[CX + d * 6, 14], [CX + d * 19, 18], [CX + d * 21, 40], [CX + d * 22.5, 63]], 6.5, 4.5, { tip: false }));
+          back.push(L([[CX + d * 4, 30], [CX + d * 12, 40], [CX + d * 14, 52], [CX + d * 14, 63]], 5, 4.5, { tip: false }));
+        });
+        return { back, front };
+      },
+    },
+    wavy: {
+      name: 'Wavy',
+      build() {
+        const P = [37, 7.5];
+        const front = [cap(P, { band: [8, 11.5] })];
+        for (let k = 0; k < 5; k++) {
+          const ex = 21 + k * 2.6;
+          front.push(L([[P[0] - 1, P[1] + 0.5], [30 - k, 3], [ex + 6, 12], [ex, 21 + k * 0.6]], 3.8, 1.2, { tone: k % 2 ? -0.4 : 0, sheen: [0.22, 0.42] }));
+        }
+        [-1, 1].forEach(d => {
+          for (let k = 0; k < 3; k++) {
+            const base = CX + d * (16 + k * 1.6);
+            const segs = [[base - d * 2, 14 + k], [base + d * 3, 24], [base - d * 2.5, 36], [base + d * 2, 48 + k * 3]];
+            front.push(L(segs, 3.4, 1.4, { tone: (d > 0 ? -0.6 : 0) + (k % 2 ? -0.3 : 0), sheen: [0.18, 0.3] }));
+            front.push(L([[base + d * 2, 47 + k * 3], [base + d * 5, 52], [base - d * 1, 57], [base + d * 2.5, 62]], 2.8, 0.8, { tone: (d > 0 ? -0.8 : -0.2), sheen: [0.3, 0.5] }));
+          }
+        });
+        const back = [];
+        [-1, 1].forEach(d => back.push(L([[CX + d * 5, 16], [CX + d * 22, 20], [CX + d * 18, 44], [CX + d * 22, 63]], 7, 5, { tip: false })));
+        return { back, front };
+      },
+    },
+    ponytail: {
+      name: 'Ponytail',
+      build() {
+        const P = [32, 8];
+        const front = [cap(P, { hairline: x => hairlineStd(P)(x) - 0.8, band: [7.5, 10], stripes: 26 })];
+        front.push(...fanFringe(P, 5, 22, 40, (x, k) => 18 + [3, 1, 2, 0.5, 1.5][k], { w0: 3.0, w1: 0.8, sway: -1.5 }));
+        front.push(L([[22, 14], [19, 18], [18.5, 26], [19.5, 33]], 1.6, 0.5, { sheen: [0.3, 0.5] }));
+        const back = [
+          L([[36, 4], [46, -2], [53, 8], [51, 24]], 5.2, 3.0, { tip: false }),
+          L([[51, 22], [49.5, 32], [53, 40], [50, 48]], 3.8, 0.8, { sheen: [0.2, 0.4] }),
+          L([[49, 22], [46, 30], [47, 38], [45, 44]], 3.0, 0.6),
+        ];
+        front.push({ type: 'ball', c: [36.5, 5.6], r: 2.3, ridOverride: 'accent', swirl: false });
+        return { back, front };
+      },
+    },
+    buns: {
+      name: 'Space buns',
+      build() {
+        const P = [32, 7.8];
+        const front = [cap(P, { band: [7, 9.5], stripes: 24 })];
+        front.push({ type: 'ball', c: [20.5, 8.5], r: 6.4, swirl: true });
+        front.push({ type: 'ball', c: [43.5, 8.5], r: 6.4, swirl: true, tone: -0.4 });
+        front.push(...fanFringe(P, 5, 23, 41, (x, k) => 19 + [2, 0.5, 2.5, 1, 2][k], { w0: 2.8, w1: 0.6, jitter: 1 }));
+        front.push(L([[19.5, 15], [17.5, 22], [19.5, 28], [18, 35]], 1.6, 0.5, { sheen: [0.3, 0.5] }));
+        front.push(L([[44.5, 15], [46.5, 22], [44.5, 28], [46, 35]], 1.6, 0.5, { tone: -0.5 }));
+        return { back: [], front };
+      },
+    },
+    braid: {
+      name: 'Side braid',
+      build() {
+        const P = [26, 7.5];
+        const front = [cap(P, { band: [8, 11] })];
+        for (let k = 0; k < 5; k++) {
+          const ex = 30 + k * 3.2;
+          front.push(L([[P[0] + 1, 8], [30 + k, 4], [ex + 1, 11], [ex + 1.5, 19 + k * 1.2]], 3.4, 1.2, { tone: k % 2 ? -0.4 : 0 }));
+        }
+        front.push(L([[P[0], 8], [21, 9], [18, 16], [18, 24]], 3.0, 1.0));
+        const C = [[44, 20], [50, 30], [47, 44], [44, 58]];
+        for (let k = 0; k < 11; k++) {
+          const t = k / 10;
+          const c = cubic(C, t);
+          front.push({ type: 'ball', c, r: 3.1 - t * 0.6, sy: 0.68, tilt: (k % 2 ? 0.6 : -0.6), swirl: false, tone: -0.4 });
+        }
+        front.push({ type: 'ball', c: cubic(C, 1.04), r: 1.6, ridOverride: 'accent' });
+        front.push(L([[44, 59], [43.5, 61], [45, 63], [44, 64]], 2.4, 0.6));
+        front.push(L([[38, 9], [45, 12], [46, 18], [44.5, 22]], 3.6, 2.4, { tip: false, tone: -0.4 }));
+        return { back: [], front };
+      },
+    },
+    curly: {
+      name: 'Curly',
+      build(ctx) {
+        const r = mulberry32(99);
+        const front = [cap([32, 8], { band: [7, 9], stripes: 0 })];
+        const balls = [];
+        for (let k = 0; k < 26; k++) {
+          const a = Math.PI * (1.02 + 0.96 * (k / 25));
+          const rr = 15.5 + r() * 2.2;
+          balls.push({ type: 'ball', c: [SK.cx + Math.cos(a) * rr * 1.05, SK.cy + 1 + Math.sin(a) * rr * 0.92], r: 3.4 + r() * 1.3, swirl: true });
+        }
+        for (let k = 0; k < 7; k++) balls.push({ type: 'ball', c: [22 + k * 3.3 + r(), 17.5 + r() * 2], r: 2.5 + r() * 0.6, swirl: true, tone: -0.2 });
+        [-1, 1].forEach(d => { for (let k = 0; k < 4; k++) balls.push({ type: 'ball', c: [CX + d * (16.8 + r() * 1.6), 25 + k * 4.3], r: 3 + r() * 0.8, swirl: true, tone: d > 0 ? -0.5 : 0 }); });
+        balls.sort((a, b) => a.c[1] - b.c[1]);
+        front.push(...balls);
+        const back = [];
+        [-1, 1].forEach(d => { for (let k = 0; k < 5; k++) back.push({ type: 'ball', c: [CX + d * (19 + r() * 2), 18 + k * 5.5], r: 4.2 + r(), swirl: true }); });
+        return { back, front };
+      },
+    },
+    mohawk: {
+      name: 'Mohawk',
+      build() {
+        const front = [];
+        const crest = [[-6, 20, 5], [-4, 18, 9], [-2, 16, 12], [0, 15, 14], [2, 16, 12], [4, 18, 9], [6, 20, 5]];
+        crest.forEach(([dx, y, h], k) => {
+          const lean = dx * 0.35;
+          front.push(L([[CX + dx * 0.55, y], [CX + dx * 0.6, y - h * 0.4], [CX + dx * 0.8 + lean, y - h * 0.8], [CX + dx + lean * 1.6, y - h - 2]], 4.6, 0.5, { tone: k % 2 ? -0.5 : 0.1, sheen: [0.3, 0.55] }));
+        });
+        front.push(L([[CX - 2, 19], [CX - 1, 15], [CX - 3, 11], [CX - 6, 7]], 3.2, 0.5, { tone: 0.3 }));
+        front.push(L([[CX + 2, 19], [CX + 1, 15], [CX + 3, 11], [CX + 6, 7]], 3.2, 0.5, { tone: -0.6 }));
+        return {
+          back: [], front,
+          scalp(ctx) {
+            const { B, R } = ctx;
+            for (let y = 6; y < 30; y++) for (let x = 0; x < N; x++) {
+              if (!mget(ctx.headMask, x, y) || edge4(ctx.headMask, x, y)) continue;
+              const ad = Math.abs(x + 0.5 - CX);
+              if (y + 0.5 > 17.6 + (ad > 7 ? (ad - 7) ** 2 * 0.33 : 0)) continue;
+              B.retint(x, y, [R.skin], R.stubble);
+              if ((x + y) % 2 === 0) B.retint(x, y, [R.stubble], R.stubbleDot);
+            }
+          },
+        };
+      },
+    },
+  };
+
+  function buildHair(ctx, def) { return def.build(ctx); }
+
+  // Rasterize hair primitives into a temp list of {x,y,tone,prim} preserving painter order.
+  function drawHairLayer(ctx, prims, rid, isBack) {
+    const { B, R } = ctx;
+    if (!prims || !prims.length) return;
+    const tone = new Float32Array(N * N).fill(-99);
+    const owner = new Int16Array(N * N).fill(-1);
+    const sep = new Uint8Array(N * N);
+    const ridMap = new Int16Array(N * N).fill(rid);
+    prims.forEach((p, idx) => {
+      if (p.type === 'cap') {
+        for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+          const px = x + 0.5, py = y + 0.5;
+          const dx = px - SK.cx, dy = py - SK.cy;
+          const d = Math.hypot(dx, dy);
+          if (d > SK.r || py > p.hairline(px)) continue;
+          const n = norm3([dx / SK.r, dy / SK.r, Math.sqrt(Math.max(0.05, 1 - (d / SK.r) ** 2))]);
+          let I = n[0] * LIGHT[0] + n[1] * LIGHT[1] + n[2] * LIGHT[2];
+          let t = 1 + I * 4.2;
+          const pd = Math.hypot(px - p.part[0], py - p.part[1]);
+          const ang = Math.atan2(py - p.part[1], px - p.part[0]);
+          if (p.stripes) {
+            const s = Math.sin(ang * p.stripes + Math.sin(pd * 0.7 + ang * 3) * 1.4);
+            if (s > 0.8 && hash2(x, y, 11) > 0.25) t -= 0.9;
+          }
+          if (pd > p.band[0] && pd < p.band[1] + Math.sin(ang * 9) * 0.6 && px < CX + 6) t = Math.max(t, 5.6);
+          if (pd < 1.2) t -= 1;
+          tone[y * N + x] = t; owner[y * N + x] = idx;
+        }
+      } else if (p.type === 'lock') {
+        const wfn = t => {
+          let w = lerp(p.w0, p.w1, t);
+          if (p.tip) w *= Math.min(1, Math.pow((1 - t) / 0.3, 0.6) + 0.15);
+          return w;
+        };
+        rasterStroke(p.pts, wfn, (x, y, t, s, tx, ty) => {
+          const nx = -ty * s, ny = tx * s, nz = Math.sqrt(Math.max(0, 1 - s * s));
+          const I = nx * LIGHT[0] + ny * LIGHT[1] + nz * LIGHT[2];
+          let tv = 2.0 + I * 3.2 + (p.tone || 0);
+          if (t > p.sheen[0] && t < p.sheen[1] && s > -0.55 && s < 0.35) tv = Math.max(tv, 5.4 + (p.tone || 0) * 0.5);
+          if (Math.abs(s) > 0.8) tv -= 0.7;
+          if (t < 0.06) tv -= 0.6;
+          const i = y * N + x;
+          tone[i] = tv; owner[i] = idx;
+        });
+      } else if (p.type === 'ball') {
+        const sy = p.sy || 1, ct = Math.cos(p.tilt || 0), st = Math.sin(p.tilt || 0);
+        for (let y = Math.floor(p.c[1] - p.r - 1); y <= p.c[1] + p.r + 1; y++) for (let x = Math.floor(p.c[0] - p.r - 1); x <= p.c[0] + p.r + 1; x++) {
+          if (x < 0 || y < 0 || x >= N || y >= N) continue;
+          let dx = x + 0.5 - p.c[0], dy = y + 0.5 - p.c[1];
+          const rx = dx * ct + dy * st, ry = (-dx * st + dy * ct) / sy;
+          const d = Math.hypot(rx, ry) / p.r;
+          if (d > 1) continue;
+          const n = norm3([dx / p.r, dy / p.r, Math.sqrt(Math.max(0.05, 1 - d * d))]);
+          const I = n[0] * LIGHT[0] + n[1] * LIGHT[1] + n[2] * LIGHT[2];
+          let tv = 1.4 + I * 4 + (p.tone || 0);
+          if (p.swirl) {
+            const a = Math.atan2(ry, rx);
+            const sw = Math.sin(a * 2 + d * 7);
+            if (sw > 0.65 && d > 0.3) tv -= 1;
+          }
+          if (d > 0.82) tv -= 0.8;
+          const i = y * N + x;
+          tone[i] = tv; owner[i] = idx;
+          if (p.ridOverride) ridMap[i] = ctx.R[p.ridOverride];
+        }
+      }
+    });
+    // separation: pixel whose neighbor (down or right) belongs to a different prim and is above in order
+    const maxT = B.ramps[rid].length - 1;
+    for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+      const i = y * N + x;
+      if (owner[i] < 0) continue;
+      let t = tone[i];
+      const o = owner[i];
+      const nb = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+      let outer = false, seam = false, outerDark = false;
+      for (const [ax, ay] of nb) {
+        const xx = x + ax, yy = y + ay;
+        if (xx < 0 || yy < 0 || xx >= N || yy >= N) { outer = true; if (ax > 0 || ay > 0) outerDark = true; continue; }
+        const j = yy * N + xx;
+        if (owner[j] < 0) { outer = true; if (ax > 0 || ay > 0) outerDark = true; }
+        else if (owner[j] > o && Math.abs(tone[j] - t) < 2.5 && prims[owner[j]].type !== 'cap' && prims[o].type !== 'cap') seam = true;
+      }
+      let ti = Math.round(t);
+      if (seam) ti -= 1;
+      ti = clamp(ti, 1, maxT);
+      if (outer) ti = outerDark ? 0 : 1;
+      const r = ridMap[i];
+      B.put(x, y, r, Math.min(ti, B.ramps[r].length - 1));
+    }
+    ctx.lastHair = owner;
+  }
+
+  function castShadow(ctx, frontPrims) {
+    const { B, R } = ctx;
+    if (!frontPrims || !frontPrims.length) return;
+    // rasterize a quick coverage mask of the front hair
+    const cov = Mask();
+    frontPrims.forEach(p => {
+      if (p.type === 'cap') {
+        for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+          const px = x + 0.5, py = y + 0.5;
+          if (Math.hypot(px - SK.cx, py - SK.cy) <= SK.r && py <= p.hairline(px)) cov[y * N + x] = 1;
+        }
+      } else if (p.type === 'lock') {
+        const wfn = t => { let w = lerp(p.w0, p.w1, t); if (p.tip) w *= Math.min(1, Math.pow((1 - t) / 0.3, 0.6) + 0.15); return w; };
+        rasterStroke(p.pts, wfn, (x, y) => { cov[y * N + x] = 1; });
+      } else if (p.type === 'ball') {
+        const sy = p.sy || 1;
+        for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+          const dx = x + 0.5 - p.c[0], dy = (y + 0.5 - p.c[1]) / sy;
+          if (Math.hypot(dx, dy) <= p.r) cov[y * N + x] = 1;
+        }
+      }
+    });
+    const affected = [R.skin, R.blush, R.sclera, R.iris, R.stubble, R.stubbleDot, R.lip];
+    for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+      if (cov[y * N + x]) continue;
+      const near = mget(cov, x - 1, y - 1) || mget(cov, x, y - 1) || mget(cov, x - 1, y - 2) || mget(cov, x, y - 2);
+      if (near) B.shift(x, y, -1, affected);
+    }
+  }
+
+  // ---------- accessories ----------
+  function drawEarrings(ctx) {
+    const { B, R } = ctx;
+    [-1, 1].forEach(side => {
+      const x = Math.floor(CX + side * 14.6), y = 35;
+      B.put(x, y, R.gold, 4);
+      B.put(x, y + 1, R.gold, 2); B.put(x - 1, y + 2, R.gold, 3); B.put(x + 1, y + 2, R.gold, 1); B.put(x, y + 3, R.gold, 1);
+      B.put(x, y + 2, R.glow, 3);
+    });
+  }
+  function drawEyewear(ctx) {
+    const { B, R, state } = ctx;
+    const w = state.eyewear;
+    if (!w || w === 'none') return;
+    if (w === 'glasses' || w === 'shades') {
+      [-1, 1].forEach(dir => {
+        const cx = CX + dir * 7.4, cy = 30.2;
+        for (let y = 24; y < 37; y++) for (let x = Math.floor(cx - 6); x < cx + 6; x++) {
+          const d = Math.hypot((x + 0.5 - cx) / 4.3, (y + 0.5 - cy) / 3.7);
+          if (d < 1.0 && d > 0.78) B.put(x, y, w === 'shades' ? R.dark : R.gold, (y < cy ? 3 : 1) + (dir > 0 ? -1 : 0));
+          else if (d <= 0.78) {
+            if (w === 'shades') B.overlay(x, y, [24, 22, 34], 0.86);
+            else B.overlay(x, y, [200, 230, 255], 0.13);
+            const gx = x + 0.5 - cx, gy = y + 0.5 - cy;
+            if (Math.abs(gx + gy + 2.2) < 0.6 && gx < 0) B.overlay(x, y, [255, 255, 255], w === 'shades' ? 0.55 : 0.45);
+          }
+        }
+      });
+      for (let x = CX - 3; x <= CX + 2; x++) B.put(x, 29, w === 'shades' ? R.dark : R.gold, 2);
+      for (let x = 13; x <= 19; x++) B.put(x, 29, w === 'shades' ? R.dark : R.gold, 3);
+      for (let x = 44; x <= 50; x++) B.put(x, 29, w === 'shades' ? R.dark : R.gold, 1);
+    }
+    if (w === 'visor') {
+      for (let y = 26; y < 34; y++) for (let x = 15; x < 49; x++) {
+        const dx = x + 0.5 - CX, py = y + 0.5;
+        const top = 27 + (dx * dx) / 220, bot = 33 - (dx * dx) / 400;
+        if (py < top || py > bot) continue;
+        const edge = py - top < 1 || bot - py < 1 || Math.abs(dx) > 16;
+        if (edge) B.put(x, y, R.steel, py - top < 1 ? 4 : 1);
+        else {
+          const g = (py - top) / (bot - top);
+          B.overlay(x, y, mixRgb([90, 230, 255], [140, 80, 220], g), 0.62);
+          if (Math.abs(dx + 9 - (py - top) * 1.4) < 0.7) B.overlay(x, y, [255, 255, 255], 0.6);
+        }
+      }
+    }
+    if (w === 'monocle') {
+      const cx = CX + 7.4, cy = 30.2;
+      for (let y = 24; y < 37; y++) for (let x = 33; x < 46; x++) {
+        const d = Math.hypot(x + 0.5 - cx, y + 0.5 - cy) / 4.1;
+        if (d < 1 && d > 0.76) B.put(x, y, R.gold, y < cy ? 4 : 2);
+        else if (d <= 0.76) B.overlay(x, y, [210, 235, 255], 0.16);
+      }
+      for (let y = 34; y < 50; y++) B.put(Math.round(44 + (y - 34) * 0.2), y, R.gold, y % 2 ? 2 : 4);
+    }
+  }
+  function drawExtra(ctx) {
+    const { B, R, state } = ctx;
+    const e = state.extra;
+    if (e === 'headphones') {
+      const stroke = [[15.5, 30], [13, 4], [51, 4], [48.5, 30]];
+      rasterStroke(stroke, () => 1.5, (x, y, t, s) => B.put(x, y, R.dark, Math.abs(s) > 0.6 ? 0 : (s < 0 ? 3 : 2)));
+      [-1, 1].forEach(side => {
+        const cx = CX + side * 16, cy = 31;
+        for (let y = 24; y < 39; y++) for (let x = Math.floor(cx - 5); x < cx + 5; x++) {
+          const d = Math.hypot((x + 0.5 - cx) / 3.4, (y + 0.5 - cy) / 5.2);
+          if (d > 1) continue;
+          let t = d > 0.82 ? 0 : (x + 0.5 < cx ? 3 : 2);
+          if (d < 0.5) t = side < 0 ? 4 : 3;
+          B.put(x, y, d < 0.5 ? R.accent : R.dark, t);
+        }
+      });
+    }
+    if (e === 'antennae') {
+      [-1, 1].forEach(side => {
+        const pts = [[CX + side * 5, 9], [CX + side * 7, 3], [CX + side * 11, 1], [CX + side * 13, -1]];
+        rasterStroke(pts, () => 0.6, (x, y) => B.put(x, y, R.dark, 2));
+        const bx = CX + side * 12.5, by = 1.8;
+        for (let y = -1; y < 6; y++) for (let x = Math.floor(bx - 3); x < bx + 3; x++) {
+          const d = Math.hypot(x + 0.5 - bx, y + 0.5 - by) / 2.3;
+          if (d > 1 || y < 0) continue;
+          B.put(x, y, R.glow, d > 0.8 ? 1 : (x + 0.5 < bx && y + 0.5 < by ? 4 : 3));
+        }
+      });
+    }
+    if (e === 'flower') {
+      const fx = 42.5, fy = 13.5;
+      for (let k = 0; k < 5; k++) {
+        const a = k / 5 * Math.PI * 2 - Math.PI / 2;
+        const px = fx + Math.cos(a) * 2.2, py = fy + Math.sin(a) * 2.2;
+        for (let y = Math.floor(py - 2); y <= py + 2; y++) for (let x = Math.floor(px - 2); x <= px + 2; x++) {
+          const d = Math.hypot(x + 0.5 - px, y + 0.5 - py) / 1.6;
+          if (d <= 1) B.put(x, y, R.accent, d > 0.75 ? 1 : (y + 0.5 < py ? 4 : 3));
+        }
+      }
+      B.put(42, 13, R.gold, 4); B.put(43, 13, R.gold, 3); B.put(42, 14, R.gold, 2); B.put(43, 14, R.gold, 2);
+    }
+    if (e === 'bandana') {
+      for (let y = 0; y < 24; y++) for (let x = 0; x < N; x++) {
+        const px = x + 0.5, py = y + 0.5;
+        const dx = px - SK.cx, d = Math.hypot(dx, py - SK.cy);
+        const band = py > 12.5 + (dx * dx) / 90 && py < 16.8 + (dx * dx) / 90;
+        const under = B.rid(x, y);
+        const onHead = mget(ctx.headMask, x, y) || [R.hair, R.skin, R.stubble, R.stubbleDot].includes(under);
+        if (d <= SK.r + 0.6 && band && onHead) {
+          const edge = py < 13.5 + (dx * dx) / 90 || py > 15.8 + (dx * dx) / 90;
+          B.put(x, y, R.accent, edge ? 1 : (dx < 0 ? 4 : 3));
+        }
+      }
+      for (let y = 16; y < 22; y++) { B.put(46 + ((y - 16) >> 1), y, R.accent, 2); B.put(47 + ((y - 16) >> 1), y, R.accent, 1); }
+    }
+  }
+
+  // ---------- output ----------
+  function toImageData(B, bg) {
+    const out = new Uint8ClampedArray(N * N * 4);
+    for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+      const i = y * N + x, o = i * 4;
+      let c = null, a = 0;
+      if (B.ramp[i] >= 0) { c = B.ramps[B.ramp[i]][B.tone[i]]; a = 255; }
+      else if (bg) { c = bg(x, y); a = c ? 255 : 0; }
+      if (!c) { out[o + 3] = 0; continue; }
+      let r = c[0], g = c[1], b = c[2];
+      const oa = B.ov[o + 3];
+      if (oa > 0) { r = r * (1 - oa) + B.ov[o] * oa; g = g * (1 - oa) + B.ov[o + 1] * oa; b = b * (1 - oa) + B.ov[o + 2] * oa; }
+      out[o] = r; out[o + 1] = g; out[o + 2] = b; out[o + 3] = a;
+    }
+    return out;
+  }
+
+  const BACKDROPS = {
+    none: null,
+    cosmos: (seed) => {
+      const r = mulberry32(seed);
+      const stars = [];
+      for (let k = 0; k < 26; k++) stars.push([Math.floor(r() * N), Math.floor(r() * N), r()]);
+      return (x, y) => {
+        const t = y / N;
+        let c = mixRgb([24, 20, 52], [58, 32, 82], t);
+        const neb = Math.sin(x * 0.12 + y * 0.07) + Math.sin(x * 0.05 - y * 0.11 + 1.3);
+        if (neb > 1.2) c = mixRgb(c, [96, 58, 130], 0.35);
+        if (neb > 1.6) c = mixRgb(c, [70, 120, 170], 0.25);
+        for (const [sx, sy, b] of stars) {
+          if (sx === x && sy === y) return b > 0.7 ? [255, 244, 214] : [180, 190, 230];
+          if (b > 0.88 && Math.abs(sx - x) + Math.abs(sy - y) === 1) return [120, 120, 180];
+        }
+        return c;
+      };
+    },
+    dusk: () => (x, y) => mixRgb([242, 196, 160], [180, 120, 160], y / N),
+    sky: (seed) => {
+      const r = mulberry32(seed + 5);
+      const clouds = [[r() * 50, 8 + r() * 10, 9 + r() * 5], [r() * 50 + 10, 26 + r() * 10, 7 + r() * 4]];
+      return (x, y) => {
+        let c = mixRgb([126, 178, 228], [196, 222, 240], y / N);
+        for (const [cx, cy, w] of clouds) {
+          const d = ((x - cx) / w) ** 2 + ((y - cy) / (w * 0.32)) ** 2;
+          if (d < 1) return y < cy ? [250, 252, 255] : [222, 234, 246];
+        }
+        return c;
+      };
+    },
+    neon: (seed) => {
+      const r = mulberry32(seed + 9);
+      const signs = [[Math.floor(r() * 18), 10 + Math.floor(r() * 20), [255, 70, 170]], [40 + Math.floor(r() * 18), 6 + Math.floor(r() * 24), [60, 220, 255]]];
+      const rain = Array.from({ length: 18 }, () => [Math.floor(r() * N), Math.floor(r() * N), 3 + Math.floor(r() * 4)]);
+      return (x, y) => {
+        let c = mixRgb([14, 12, 34], [40, 18, 54], y / N);
+        // skyline silhouettes
+        const bh = 34 + Math.floor(6 * Math.sin(Math.floor(x / 6) * 2.3) + 4 * Math.cos(Math.floor(x / 4) * 1.7));
+        if (y > bh) { c = [20, 16, 38]; if ((x % 5 === 2) && (y % 4 === 1) && hash2(x, y, 4) > 0.55) c = hash2(x, y, 8) > 0.5 ? [255, 196, 90] : [120, 210, 255]; }
+        for (const [sx, sy, col] of signs) {
+          if (x >= sx && x < sx + 6 && y >= sy && y < sy + 3) return (x === sx || x === sx + 5 || y === sy || y === sy + 2) ? col : mixRgb(col, [255, 255, 255], 0.45);
+          const g = Math.hypot(x - sx - 3, y - sy - 1.5);
+          if (g < 7) c = mixRgb(c, col, 0.16 * (1 - g / 7));
+        }
+        for (const [rx, ry, len] of rain) if (x === rx && y >= ry && y < ry + len) return mixRgb(c, [150, 170, 230], 0.45);
+        return c;
+      };
+    },
+    sage: () => (x, y) => ((x + y) % 2 === 0 && y > 40) ? [168, 190, 160] : [178, 198, 168],
+    slate: () => (x, y) => mixRgb([70, 82, 104], [46, 54, 72], y / N),
+  };
+
+  function draw(canvas, state, scale) {
+    const B = render(state);
+    const bgf = BACKDROPS[state.backdrop] ? BACKDROPS[state.backdrop](state.seed || 3) : null;
+    const data = toImageData(B, bgf);
+    const off = document.createElement('canvas');
+    off.width = N; off.height = N;
+    const octx = off.getContext('2d');
+    octx.putImageData(new ImageData(data, N, N), 0, 0);
+    const s = scale || Math.floor(canvas.width / N);
+    const c2 = canvas.getContext('2d');
+    c2.imageSmoothingEnabled = false;
+    c2.clearRect(0, 0, canvas.width, canvas.height);
+    c2.drawImage(off, 0, 0, N * s, N * s);
+    return off;
+  }
+
+  const OPTIONS = {
+    headShape: ['round', 'oval', 'square', 'heart'],
+    ears: ['normal', 'small', 'pointed'],
+    build: ['slim', 'broad'],
+    hairStyle: Object.keys(HAIR),
+    eyeStyle: Object.keys(EYES),
+    browStyle: Object.keys(BROWS),
+    noseStyle: Object.keys(NOSES),
+    mouthStyle: Object.keys(MOUTHS),
+    lips: Object.keys(PALETTE.lips),
+    facialHair: ['none', 'stubble', 'mustache', 'handlebar', 'goatee', 'beard'],
+    marks: ['none', 'freckles', 'mole', 'scar', 'implant', 'circuit', 'star', 'stripes'],
+    outfit: ['tee', 'sweater', 'buttonup', 'jacket', 'hoodie', 'turtleneck', 'tech', 'flight'],
+    eyewear: ['none', 'glasses', 'shades', 'monocle', 'visor'],
+    extra: ['none', 'earrings', 'headphones', 'flower', 'bandana', 'antennae'],
+    backdrop: Object.keys(BACKDROPS),
+  };
+
+  // Worlds: which parts and palette entries each game may use. Missing keys allow everything.
+  const range = n => Array.from({ length: n }, (_, i) => i);
+  const WORLDS = {
+    country: {
+      name: 'Across Country', blurb: 'Early 2000s. Human skin tones and natural hair only.',
+      allow: {
+        skin: range(7), hairColor: range(7), eyeColor: [0, 1, 2, 3, 4, 6],
+        ears: ['normal', 'small'],
+        hairStyle: ['bald', 'buzz', 'tousled', 'sidepart', 'spiky', 'bob', 'long', 'wavy', 'ponytail', 'buns', 'braid', 'curly', 'mohawk'],
+        lips: ['natural', 'rose', 'berry', 'coral', 'plum'],
+        marks: ['none', 'freckles', 'mole', 'scar'],
+        outfit: ['tee', 'sweater', 'buttonup', 'jacket', 'hoodie', 'turtleneck'],
+        eyewear: ['none', 'glasses', 'shades'],
+        extra: ['none', 'earrings', 'headphones', 'flower', 'bandana'],
+        backdrop: ['sky', 'dusk', 'sage', 'slate', 'none'],
+      },
+      glow: '#e0b040',
+    },
+    underpass: {
+      name: 'Underpass', blurb: 'Still human, but cyberpunk: neon dye, chrome and implants.',
+      allow: {
+        skin: range(7), hairColor: range(12), eyeColor: range(9),
+        ears: ['normal', 'small'],
+        hairStyle: ['bald', 'buzz', 'tousled', 'sidepart', 'spiky', 'undercut', 'bob', 'long', 'ponytail', 'buns', 'braid', 'mohawk'],
+        lips: ['natural', 'rose', 'berry', 'plum'],
+        marks: ['none', 'freckles', 'scar', 'implant', 'circuit', 'stripes'],
+        outfit: ['tee', 'jacket', 'hoodie', 'turtleneck', 'tech'],
+        eyewear: ['none', 'shades', 'visor'],
+        extra: ['none', 'earrings', 'headphones', 'bandana'],
+        backdrop: ['neon', 'slate', 'none'],
+      },
+      glow: '#3fd6e0',
+    },
+    cosmos: {
+      name: 'Across Cosmos', blurb: 'Everything: alien skin, pointed ears, flight suits, stardust.',
+      allow: { backdrop: ['cosmos', 'neon', 'sky', 'dusk', 'sage', 'slate', 'none'] },
+      glow: null,
+    },
+  };
+  // Presentation tags: options listed here belong to one presentation only; anything unlisted is shared.
+  const SEX_TAGS = {
+    headShape: { square: 'masc', heart: 'fem' },
+    build: { broad: 'masc', slim: 'fem' },
+    hairStyle: { bald: 'masc', buzz: 'masc', spiky: 'masc', bob: 'fem', wavy: 'fem', buns: 'fem', braid: 'fem' },
+    browStyle: { bushy: 'masc', arched: 'fem' },
+    eyeStyle: { wide: 'fem' },
+    mouthStyle: { lips: 'fem' },
+    lips: { rose: 'fem', berry: 'fem', coral: 'fem', plum: 'fem' },
+    facialHair: { stubble: 'masc', mustache: 'masc', handlebar: 'masc', goatee: 'masc', beard: 'masc' },
+    extra: { flower: 'fem' },
+  };
+  function sexOk(key, opt, sex) {
+    if (!sex || sex === 'either') return true;
+    const tag = SEX_TAGS[key] && SEX_TAGS[key][opt];
+    return !tag || tag === sex;
+  }
+  function allowed(world, key, sex) {
+    const w = WORLDS[world] || WORLDS.cosmos;
+    let list = w.allow[key] || (PALETTE_KEYS[key] ? range(PALETTE_KEYS[key]().length) : OPTIONS[key]);
+    return list.filter(o => sexOk(key, o, sex));
+  }
+  const PALETTE_KEYS = { skin: () => PALETTE.skin, hairColor: () => PALETTE.hair, eyeColor: () => PALETTE.eye, outfitColor: () => PALETTE.cloth, accentColor: () => PALETTE.cloth };
+  // Coerce any state into a world + presentation (used when switching either).
+  function fit(state, world, sex) {
+    sex = sex || state.sex || 'fem';
+    const out = Object.assign({}, state, { world, sex });
+    Object.keys(OPTIONS).concat(Object.keys(PALETTE_KEYS)).forEach(k => {
+      const list = allowed(world, k, sex);
+      if (!list.includes(out[k])) out[k] = k === 'backdrop' ? list[0] : (list.includes('none') ? 'none' : list[0]);
+    });
+    if (!allowed(world, 'headShape', sex).includes(state.headShape)) out.headShape = sex === 'masc' ? 'square' : 'heart';
+    out.glow = (WORLDS[world] || WORLDS.cosmos).glow;
+    return out;
+  }
+  const fitWorld = (state, world) => fit(state, world, state.sex);
+
+  const WEIGHTS = {
+    eyeStyle: { closed: 0.4 },
+    ears: { normal: 6, small: 2, pointed: 1 },
+    lips: { natural: 5, rose: 1, berry: 1, coral: 1, plum: 0.5 },
+    facialHair: { none: 4, stubble: 3, mustache: 1, handlebar: 0.5, goatee: 1.2, beard: 2 },
+    marks: { none: 5, freckles: 2, mole: 1, scar: 0.6, implant: 1.2, circuit: 1, star: 0.6, stripes: 0.5 },
+    eyewear: { none: 8, glasses: 2, shades: 0.8, monocle: 0.3, visor: 1 },
+    extra: { none: 6, earrings: 2, headphones: 0.8, flower: 0.8, bandana: 0.6, antennae: 0.4 },
+    hairStyle: { bald: 0.5 },
+  };
+  const SEX_WEIGHTS = {
+    fem: {
+      hairStyle: { long: 3, wavy: 3, bob: 3, ponytail: 3, buns: 2, braid: 2, curly: 2, tousled: 0.8, sidepart: 0.6, undercut: 0.6, mohawk: 0.3 },
+      mouthStyle: { lips: 2.5 }, lips: { natural: 3, rose: 1.5, berry: 1, coral: 1.2, plum: 0.6 },
+      extra: { none: 5, earrings: 3.5, flower: 1.2 },
+    },
+    masc: {
+      hairStyle: { tousled: 3, sidepart: 3, spiky: 2, buzz: 2, undercut: 2, curly: 1.5, long: 0.6, ponytail: 0.5, mohawk: 0.6, bald: 0.8 },
+      extra: { none: 7, earrings: 0.8 },
+    },
+  };
+  function randomState(seed, world, sex) {
+    world = world || 'cosmos';
+    const r = mulberry32(seed);
+    if (!sex || sex === 'either') sex = r() < 0.5 ? 'masc' : 'fem';
+    const pickW = key => {
+      const list = allowed(world, key, sex), w = Object.assign({}, WEIGHTS[key] || {}, (SEX_WEIGHTS[sex] || {})[key] || {});
+      const tot = list.reduce((a, v) => a + (w[v] !== undefined ? w[v] : 2), 0);
+      let v = r() * tot;
+      for (const opt of list) { v -= (w[opt] !== undefined ? w[opt] : 2); if (v <= 0) return opt; }
+      return list[0];
+    };
+    const pickIdx = (key, humanBias) => {
+      const list = allowed(world, key, sex);
+      if (humanBias && world === 'cosmos' && r() < 0.85) return list.filter(i => i < 7)[Math.floor(r() * 7)];
+      return list[Math.floor(r() * list.length)];
+    };
+    const st = {
+      seed, world, sex,
+      headShape: pickW('headShape'), ears: pickW('ears'), build: pickW('build'),
+      skin: pickIdx('skin', true),
+      hairStyle: pickW('hairStyle'),
+      hairColor: world === 'underpass' ? (r() < 0.5 ? Math.floor(r() * 7) : 7 + Math.floor(r() * 5)) : pickIdx('hairColor', true),
+      eyeStyle: pickW('eyeStyle'), eyeColor: pickIdx('eyeColor'),
+      browStyle: pickW('browStyle'), noseStyle: pickW('noseStyle'), mouthStyle: pickW('mouthStyle'),
+      lips: pickW('lips'), facialHair: pickW('facialHair'), marks: pickW('marks'),
+      blush: r() < (sex === 'fem' ? 0.5 : 0.12),
+      outfit: pickW('outfit'), outfitColor: pickIdx('outfitColor'), accentColor: pickIdx('accentColor'),
+      eyewear: pickW('eyewear'), extra: pickW('extra'),
+      backdrop: allowed(world, 'backdrop')[0],
+    };
+    st.glow = (WORLDS[world] || WORLDS.cosmos).glow;
+    return st;
+  }
+
+  return { N, render, draw, toImageData, OPTIONS, PALETTE, HAIR, randomState, BACKDROPS, WORLDS, allowed, fitWorld, fit, SEX_TAGS, SEX_WEIGHTS, makeRamp, SPECS: { SKIN_SPEC, HAIR_SPEC, CLOTH_SPEC, IRIS_SPEC, METAL_SPEC } };
+})();
+if (typeof module !== 'undefined') module.exports = RIG;
+
+</script>
+<script>
+(function(){
+  const N = RIG.N;
+  const LABELS = {
+    headShape:'Head shape', skin:'Skin tone', ears:'Ears', build:'Build',
+    eyeStyle:'Eye shape', eyeColor:'Eye color', browStyle:'Brows', noseStyle:'Nose', mouthStyle:'Mouth', lips:'Lip tint', marks:'Marks', blush:'Blush',
+    hairStyle:'Hair style', hairColor:'Hair color', facialHair:'Facial hair',
+    outfit:'Outfit', outfitColor:'Outfit color', accentColor:'Accent color',
+    eyewear:'Eyewear', extra:'Extra', backdrop:'Backdrop',
+  };
+  const PRETTY = { implant:'Implant', circuit:'Circuit lines', stripes:'Face paint', tech:'Techwear', buttonup:'Button-up', flight:'Flight suit', sidepart:'Side part', buns:'Space buns', braid:'Side braid', closed:'Closed', handlebar:'Handlebar', none:'None' };
+  const pretty = v => PRETTY[v] || (RIG.HAIR[v] && RIG.HAIR[v].name) || (String(v).charAt(0).toUpperCase() + String(v).slice(1));
+  const TABS = [
+    { id:'face', name:'FACE', groups:['headShape','skin','ears','noseStyle','mouthStyle','lips','blush','marks'] },
+    { id:'eyes', name:'EYES', groups:['eyeStyle','eyeColor','browStyle'] },
+    { id:'hair', name:'HAIR', groups:['hairStyle','hairColor','facialHair'] },
+    { id:'outfit', name:'OUTFIT', groups:['build','outfit','outfitColor','accentColor'] },
+    { id:'extras', name:'EXTRAS', groups:['eyewear','extra','backdrop'] },
+  ];
+  const SWATCH = { skin: RIG.PALETTE.skin, hairColor: RIG.PALETTE.hair, eyeColor: RIG.PALETTE.eye, outfitColor: RIG.PALETTE.cloth, accentColor: RIG.PALETTE.cloth };
+
+  let seedCounter = Math.floor(Math.random() * 900000) + 100000;
+  let world = 'cosmos';
+  try { world = localStorage.getItem('rig.world') || 'cosmos'; } catch (e) {}
+  if (!RIG.WORLDS[world]) world = 'cosmos';
+  let rollSex = 'either';
+  try { rollSex = localStorage.getItem('rig.sex') || 'either'; } catch (e) {}
+  if (!['masc', 'fem', 'either'].includes(rollSex)) rollSex = 'either';
+  let state = RIG.randomState(seedCounter, world, rollSex);
+  try { const saved = JSON.parse(localStorage.getItem('rig.current') || 'null'); if (saved && saved.hairStyle) state = RIG.fit(Object.assign(state, saved), world, saved.sex || state.sex); } catch (e) {}
+  const locks = new Set();
+  let showGuides = false;
+
+  const portrait = document.getElementById('portrait');
+  const guides = document.getElementById('guides');
+  const status = document.getElementById('status');
+  const say = msg => { status.textContent = msg; };
+
+  // ---- world switcher ----
+  const worldsEl = document.getElementById('worlds');
+  const worldBtns = Object.entries(RIG.WORLDS).map(([id, w]) => {
+    const b = document.createElement('button'); b.className = 'world';
+    const t = document.createElement('b'); t.textContent = w.name.toUpperCase();
+    const d = document.createElement('span'); d.textContent = w.blurb;
+    b.append(t, d);
+    b.addEventListener('click', () => setWorld(id));
+    worldsEl.appendChild(b); return [id, b];
+  });
+  function setWorld(id) {
+    world = id;
+    try { localStorage.setItem('rig.world', id); } catch (e) {}
+    document.documentElement.setAttribute('data-world', id);
+    worldBtns.forEach(([k, b]) => b.setAttribute('aria-pressed', k === id ? 'true' : 'false'));
+    state = RIG.fit(state, id, state.sex);
+    buildPanes();
+    update();
+    buildRoster();
+  }
+
+  // ---- tabs + controls ----
+  const tabsEl = document.getElementById('tabs'), panesEl = document.getElementById('panes');
+  let controls = {};
+  let activeTab = 'face';
+  let panesKey = '';
+  function buildPanes() {
+    panesKey = world + '|' + state.sex;
+    tabsEl.textContent = ''; panesEl.textContent = ''; controls = {};
+    TABS.forEach(tab => {
+      const t = document.createElement('button');
+      t.className = 'tab'; t.id = 'tab-' + tab.id; t.setAttribute('role', 'tab');
+      t.setAttribute('aria-selected', tab.id === activeTab ? 'true' : 'false');
+      t.setAttribute('aria-controls', 'pane-' + tab.id);
+      t.textContent = tab.name;
+      tabsEl.appendChild(t);
+      const pane = document.createElement('div');
+      pane.className = 'pane'; pane.id = 'pane-' + tab.id; pane.setAttribute('role', 'tabpanel');
+      pane.hidden = tab.id !== activeTab;
+      t.addEventListener('click', () => {
+        activeTab = tab.id;
+        tabsEl.querySelectorAll('.tab').forEach(b => b.setAttribute('aria-selected', b === t ? 'true' : 'false'));
+        panesEl.querySelectorAll('.pane').forEach(p => p.hidden = p !== pane);
+      });
+      tab.groups.forEach(key => pane.appendChild(buildGroup(key)));
+      panesEl.appendChild(pane);
+    });
+  }
+
+  function buildGroup(key) {
+    const g = document.createElement('div'); g.className = 'group';
+    const head = document.createElement('div'); head.className = 'ghead';
+    const lab = document.createElement('span'); lab.className = 'glabel'; lab.textContent = LABELS[key];
+    const lock = document.createElement('button'); lock.className = 'lock'; lock.setAttribute('aria-pressed', locks.has(key) ? 'true' : 'false');
+    lock.textContent = locks.has(key) ? 'LOCKED' : 'LOCK'; lock.title = 'Keep this when randomizing';
+    lock.addEventListener('click', () => {
+      if (locks.has(key)) locks.delete(key); else locks.add(key);
+      lock.setAttribute('aria-pressed', locks.has(key) ? 'true' : 'false');
+      lock.textContent = locks.has(key) ? 'LOCKED' : 'LOCK';
+    });
+    head.append(lab, lock); g.appendChild(head);
+    let body;
+    if (key === 'blush') {
+      body = document.createElement('label'); body.className = 'toggle';
+      const cb = document.createElement('input'); cb.type = 'checkbox'; cb.id = 'opt-blush';
+      cb.addEventListener('change', () => { state.blush = cb.checked; update(); });
+      body.append(cb, document.createTextNode('Rosy cheeks'));
+      controls[key] = () => { cb.checked = !!state.blush; };
+    } else if (SWATCH[key]) {
+      body = document.createElement('div'); body.className = 'swatches';
+      const okIdx = RIG.allowed(world, key, state.sex);
+      const btns = SWATCH[key].map((hex, i) => {
+        if (!okIdx.includes(i)) return null;
+        const b = document.createElement('button'); b.className = 'sw'; b.style.background = hex;
+        b.setAttribute('aria-label', LABELS[key] + ' ' + (i + 1));
+        b.addEventListener('click', () => { state[key] = i; update(); });
+        body.appendChild(b); return b;
+      });
+      controls[key] = () => btns.forEach((b, i) => b && b.setAttribute('aria-pressed', state[key] === i ? 'true' : 'false'));
+    } else {
+      body = document.createElement('div'); body.className = 'chips';
+      const btns = RIG.allowed(world, key, state.sex).map(v => {
+        const b = document.createElement('button'); b.className = 'chip'; b.textContent = pretty(v);
+        b.addEventListener('click', () => { state[key] = v; update(); });
+        body.appendChild(b); return [v, b];
+      });
+      controls[key] = () => btns.forEach(([v, b]) => b.setAttribute('aria-pressed', state[key] === v ? 'true' : 'false'));
+    }
+    g.appendChild(body);
+    return g;
+  }
+
+  // ---- drawing ----
+  function drawGuides() {
+    const g = guides.getContext('2d');
+    g.clearRect(0, 0, guides.width, guides.height);
+    if (!showGuides) return;
+    const s = guides.width / N;
+    g.fillStyle = 'rgba(255,179,92,0.08)';
+    g.fillRect(0, 22 * s, guides.width, 18 * s);
+    const bands = [[21, 26, 'BROWS', 'rgba(127,108,240,0.18)'], [26, 33, 'EYES', 'rgba(127,108,240,0.28)'], [33, 37, 'NOSE', 'rgba(80,200,200,0.22)'], [38, 42, 'MOUTH', 'rgba(255,110,140,0.26)']];
+    bands.forEach(([a, b, label, fill]) => { g.fillStyle = fill; g.fillRect(14 * s, a * s, 36 * s, (b - a) * s); });
+    g.strokeStyle = 'rgba(255,179,92,0.85)'; g.setLineDash([6, 5]); g.lineWidth = 1;
+    [22, 40].forEach(r => { g.beginPath(); g.moveTo(0, r * s + .5); g.lineTo(guides.width, r * s + .5); g.stroke(); });
+    g.setLineDash([]);
+    g.strokeStyle = 'rgba(243,234,214,0.3)';
+    g.beginPath(); g.moveTo(32 * s + .5, 0); g.lineTo(32 * s + .5, guides.height); g.stroke();
+    g.font = '10px Silkscreen, monospace'; g.textBaseline = 'middle';
+    g.fillStyle = 'rgba(255,179,92,0.95)';
+    g.fillText('FACE PLATE 22-40', 6, 22 * s - 8);
+    g.fillStyle = 'rgba(243,234,214,0.92)';
+    bands.forEach(([a, b, label]) => g.fillText(label, 6, (a + b) / 2 * s));
+  }
+
+  function update() {
+    if (panesKey !== world + '|' + state.sex) buildPanes();
+    RIG.draw(portrait, state, portrait.width / N);
+    Object.values(controls).forEach(f => f());
+    drawGuides();
+    document.getElementById('seedLabel').textContent = 'SEED ' + String(state.seed).padStart(6, '0');
+    try { localStorage.setItem('rig.current', JSON.stringify(state)); } catch (e) {}
+  }
+
+  function roll() {
+    seedCounter += 7919;
+    let fresh = RIG.randomState(seedCounter, world, rollSex);
+    locks.forEach(k => { fresh[k] = state[k]; });
+    fresh = RIG.fit(fresh, world, fresh.sex);
+    if (locks.has('hairColor')) fresh.hairColor = state.hairColor;
+    state = fresh;
+    say('');
+    update();
+  }
+
+  // ---- roster ----
+  const rosterEl = document.getElementById('roster');
+  let rosterGen = 0;
+  function buildRoster() {
+    const gen = ++rosterGen;
+    rosterEl.textContent = '';
+    document.getElementById('rosterNote').textContent = 'Twelve ' + RIG.WORLDS[world].name + (rollSex === 'either' ? '' : rollSex === 'masc' ? ' masc' : ' fem') + ' characters generated from seeds. Click one to load it into the editor.';
+    const base = Math.floor(Math.random() * 900000) + 100000;
+    const seeds = Array.from({ length: 12 }, (_, i) => base + i * 104729);
+    let i = 0;
+    const next = () => {
+      if (i >= seeds.length || gen !== rosterGen) return;
+      const st = RIG.randomState(seeds[i++], world, rollSex);
+      const b = document.createElement('button'); b.className = 'cell';
+      b.setAttribute('aria-label', 'Load crew member, seed ' + st.seed);
+      const c = document.createElement('canvas'); c.width = 128; c.height = 128;
+      b.appendChild(c); rosterEl.appendChild(b);
+      RIG.draw(c, st, 2);
+      b.addEventListener('click', () => { state = Object.assign({}, st); update(); say('Loaded crew member ' + st.seed + '.'); window.scrollTo({ top: 0, behavior: 'smooth' }); });
+      requestAnimationFrame(next);
+    };
+    next();
+  }
+
+  // ---- export ----
+  function pngBlob(scale) {
+    const c = document.createElement('canvas'); c.width = N * scale; c.height = N * scale;
+    RIG.draw(c, state, scale);
+    return new Promise(res => c.toBlob(res, 'image/png'));
+  }
+  let downloads = null;
+  const showSave = () => { document.getElementById('save64').hidden = false; document.getElementById('save512').hidden = false; };
+  showSave();
+  async function save(scale) {
+    const filename = 'portrait-' + state.seed + (scale === 1 ? '' : '@' + scale + 'x') + '.png';
+    if (!downloads) {
+      const blob = await pngBlob(scale);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = filename;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      say('Saved ' + filename + '.');
+      return;
+    }
+    try {
+      const blob = await pngBlob(scale);
+      await downloads.save({ filename, data: blob });
+      say('Saved.');
+    } catch (err) {
+      const code = err && err.code;
+      if (code === 'declined') say('Save cancelled.');
+      else if (code === 'rate_limited') say('A save prompt is already open.');
+      else say('Saving is not available here.');
+    }
+  }
+  document.getElementById('save64').addEventListener('click', () => save(1));
+  document.getElementById('save512').addEventListener('click', () => save(8));
+  document.getElementById('copyRecipe').addEventListener('click', () => {
+    const text = JSON.stringify(state);
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(() => say('Recipe copied: paste it into your game data.'), () => say('Copy blocked here. Recipe: ' + text));
+    } else say('Recipe: ' + text);
+  });
+
+  document.getElementById('roll').addEventListener('click', roll);
+  document.getElementById('newRoster').addEventListener('click', buildRoster);
+  const gb = document.getElementById('guidesBtn');
+  gb.addEventListener('click', () => { showGuides = !showGuides; gb.setAttribute('aria-pressed', showGuides ? 'true' : 'false'); drawGuides(); });
+
+  // ---- reference overlay (local only) ----
+  const refImg = document.getElementById('refImg'), refFile = document.getElementById('refFile');
+  const refOpacity = document.getElementById('refOpacity'), refOpacityWrap = document.getElementById('refOpacityWrap'), refClear = document.getElementById('refClear');
+  const drop = document.getElementById('drop'), frame = document.querySelector('.frame');
+  let refUrl = null;
+  function loadRef(file) {
+    if (!file || !file.type.startsWith('image/')) { say('That file is not an image.'); return; }
+    if (refUrl) URL.revokeObjectURL(refUrl);
+    refUrl = URL.createObjectURL(file);
+    refImg.src = refUrl; refImg.hidden = false;
+    refImg.style.opacity = refOpacity.value / 100;
+    refOpacityWrap.hidden = false; refClear.hidden = false;
+    say('Reference loaded. Turn on anchor guides to compare feature placement.');
+  }
+  refFile.addEventListener('change', () => loadRef(refFile.files[0]));
+  refOpacity.addEventListener('input', () => { refImg.style.opacity = refOpacity.value / 100; });
+  refClear.addEventListener('click', () => {
+    if (refUrl) URL.revokeObjectURL(refUrl);
+    refUrl = null; refImg.removeAttribute('src'); refImg.hidden = true;
+    refOpacityWrap.hidden = true; refClear.hidden = true; refFile.value = '';
+    say('Reference removed.');
+  });
+  frame.addEventListener('dragover', e => { e.preventDefault(); drop.hidden = false; });
+  frame.addEventListener('dragleave', () => { drop.hidden = true; });
+  frame.addEventListener('drop', e => { e.preventDefault(); drop.hidden = true; loadRef(e.dataTransfer.files[0]); });
+
+  // ---- presentation ----
+  const segBtns = Array.from(document.querySelectorAll('#sexSeg button'));
+  function paintSeg() { segBtns.forEach(b => b.setAttribute('aria-pressed', b.dataset.sex === rollSex ? 'true' : 'false')); }
+  segBtns.forEach(b => b.addEventListener('click', () => {
+    rollSex = b.dataset.sex;
+    try { localStorage.setItem('rig.sex', rollSex); } catch (e) {}
+    paintSeg();
+    if (rollSex !== 'either' && state.sex !== rollSex) { state = RIG.fit(state, world, rollSex); update(); }
+    buildRoster();
+    say(rollSex === 'either' ? 'Randomize now rolls masc or fem.' : 'Showing and rolling ' + rollSex + ' and shared parts only.');
+  }));
+  paintSeg();
+
+  setWorld(world);
+})();
+</script>
+
+</body>
+</html>

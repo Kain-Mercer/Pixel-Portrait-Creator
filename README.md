@@ -12,7 +12,7 @@ Every part (face shape, eyes, brows, nose, mouth, hair, facial hair, outfit, eye
   - **Across Country**: early 2000s, natural looks only
   - **Underpass**: still human, but cyberpunk: neon hair, visors, implants
   - **Across Cosmos**: everything, including alien skin tones, pointed ears and antennae
-- **Masc, fem or either**: randomizing only uses parts that match the chosen presentation.
+- **Gender: male, female or either**: randomizing only uses parts that match the chosen gender.
 - **Randomize with locks**: keep the parts you like and re-roll the rest.
 - **Crew roster**: twelve random characters at a time; click one to edit it.
 - **Save PNG**: 64×64 for use as a game sprite, or 512×512 for previews.

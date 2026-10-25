@@ -154,11 +154,11 @@ code{font-size:12px; background:var(--panel); border:1px solid var(--rim); borde
         <canvas id="guides" width="448" height="448" aria-hidden="true"></canvas>
         <div class="drop" id="drop" hidden>Drop a reference image</div>
       </div>
-      <div class="sexbar" role="group" aria-label="Presentation">
-        <span class="glabel">Presentation</span>
+      <div class="sexbar" role="group" aria-label="Gender">
+        <span class="glabel">Gender</span>
         <div class="seg" id="sexSeg">
-          <button data-sex="masc" aria-pressed="false">Masc</button>
-          <button data-sex="fem" aria-pressed="false">Fem</button>
+          <button data-sex="masc" aria-pressed="false">Male</button>
+          <button data-sex="fem" aria-pressed="false">Female</button>
           <button data-sex="either" aria-pressed="false">Either</button>
         </div>
       </div>
@@ -1785,6 +1785,8 @@ const RIG = (function () {
       if (!list.includes(out[k])) out[k] = k === 'backdrop' ? list[0] : (list.includes('none') ? 'none' : list[0]);
     });
     if (!allowed(world, 'headShape', sex).includes(state.headShape)) out.headShape = sex === 'masc' ? 'square' : 'heart';
+    // Changing world always brings that world's signature backdrop, even if the old one is still allowed.
+    if (state.world !== world) out.backdrop = allowed(world, 'backdrop', sex)[0];
     out.glow = (WORLDS[world] || WORLDS.cosmos).glow;
     return out;
   }
@@ -2028,7 +2030,7 @@ if (typeof module !== 'undefined') module.exports = RIG;
   function buildRoster() {
     const gen = ++rosterGen;
     rosterEl.textContent = '';
-    document.getElementById('rosterNote').textContent = 'Twelve ' + RIG.WORLDS[world].name + (rollSex === 'either' ? '' : rollSex === 'masc' ? ' masc' : ' fem') + ' characters generated from seeds. Click one to load it into the editor.';
+    document.getElementById('rosterNote').textContent = 'Twelve ' + RIG.WORLDS[world].name + (rollSex === 'either' ? '' : rollSex === 'masc' ? ' male' : ' female') + ' characters generated from seeds. Click one to load it into the editor.';
     const base = Math.floor(Math.random() * 900000) + 100000;
     const seeds = Array.from({ length: 12 }, (_, i) => base + i * 104729);
     let i = 0;
@@ -2127,7 +2129,7 @@ if (typeof module !== 'undefined') module.exports = RIG;
     paintSeg();
     if (rollSex !== 'either' && state.sex !== rollSex) { state = RIG.fit(state, world, rollSex); update(); }
     buildRoster();
-    say(rollSex === 'either' ? 'Randomize now rolls masc or fem.' : 'Showing and rolling ' + rollSex + ' and shared parts only.');
+    say(rollSex === 'either' ? 'Randomize now rolls male or female.' : 'Showing and rolling ' + (rollSex === 'masc' ? 'male' : 'female') + ' and shared parts only.');
   }));
   paintSeg();
 

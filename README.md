@@ -15,7 +15,8 @@ Every part (face shape, eyes, brows, nose, mouth, hair, facial hair, outfit, eye
 - **Gender: male, female or either**: randomizing only uses parts that match the chosen gender.
 - **Randomize with locks**: keep the parts you like and re-roll the rest.
 - **Crew roster**: twelve random characters at a time; click one to edit it.
-- **Save PNG**: 64×64 for use as a game sprite, or 512×512 for previews.
+- **Save PNG**: 64×64 for use in a game, or 512×512 for previews.
+- **Game sprite**: the same character as a 48×48 top-down sprite in four directions, with idle, walk and attack animations. Pick a weapon and equipment (head, body, hands, feet, back) and it shows on the sprite. **Save sprite sheet** writes the PNG, and **Save sheet data** writes a JSON file that describes each row for your game engine.
 - **Copy recipe**: a short JSON description that rebuilds the exact same character.
 - **Templates**: import recipes, lists or whole crew packs from JSON, and save the current character or crew as a file.
 - **Works on phones**: the portrait stays pinned at the top while you pick parts.

@@ -54,6 +54,20 @@ h1 span{color:var(--flare);}
 @media (min-width:901px) and (min-height:760px){ .left{position:sticky; top:max(12px, env(safe-area-inset-top,0px));} }
 .viewport{background:var(--hull); border:1px solid var(--rim); border-radius:14px; padding:16px; display:flex; flex-direction:column; gap:14px;}
 .dock-controls{display:flex; flex-direction:column; gap:14px; min-width:0;}
+.spritepanel{background:var(--hull); border:1px solid var(--rim); border-radius:14px; padding:14px 16px; display:flex; flex-direction:column; gap:12px;}
+.spritehead{display:flex; flex-direction:column; gap:4px;}
+.spritebody{display:grid; grid-template-columns:minmax(0,192px) minmax(0,1fr); gap:14px; align-items:start;}
+.spriteframe{position:relative; width:100%; aspect-ratio:1; border-radius:8px; overflow:hidden;
+  background: repeating-conic-gradient(#3a3550 0% 25%, #332e48 0% 50%) 0 0/16px 16px; box-shadow: inset 0 0 0 2px #0a0915, 0 0 0 1px var(--rim-hi);}
+.spriteframe canvas{position:absolute; inset:0; width:100%; height:100%; image-rendering:pixelated;}
+.spritectl{display:flex; flex-direction:column; gap:10px; min-width:0;}
+.spritectl .seg{display:flex; width:100%;}
+.spritectl .seg button{flex:1; padding:6px 8px; font-size:12px;}
+.gear{display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:8px;}
+.gear label{display:flex; flex-direction:column; gap:3px; font-size:11px; text-transform:uppercase; letter-spacing:.8px; color:var(--dim); font-weight:600; min-width:0;}
+.gear select{font:inherit; font-size:12.5px; text-transform:none; letter-spacing:0; font-weight:400; color:var(--star); background:var(--panel); border:1px solid var(--rim-hi); border-radius:8px; padding:6px 8px; min-width:0; width:100%;}
+.gear select:focus-visible{outline:2px solid var(--flare); outline-offset:1px;}
+@media (max-width:420px){ .spritebody{grid-template-columns:minmax(0,1fr);} .spriteframe{max-width:240px;} }
 .refpanel{background:var(--hull); border:1px solid var(--rim); border-radius:14px; padding:14px 16px; display:flex; flex-direction:column; gap:10px;}
 .lbl-short{display:none;}
 .right{display:flex; flex-direction:column; gap:14px; min-width:0;}
@@ -181,7 +195,10 @@ code{font-size:12px; background:var(--panel); border:1px solid var(--rim); borde
   .tabs{position:sticky; top:var(--dock-h, 0px); z-index:20;}
   .tab{flex:1; text-align:center; padding:11px 6px; font-size:10px;}
   .pane{padding:14px 12px;}
-  .refpanel{order:4;}
+  .refpanel{order:5;}
+  .spritepanel{order:4;}
+  .gear select{min-height:40px;}
+  .spritectl .seg button{min-height:40px; font-size:14px;}
   .roster{padding:12px;}
 }
 @media (max-width:360px){
@@ -242,6 +259,33 @@ code{font-size:12px; background:var(--panel); border:1px solid var(--rim); borde
         <button id="copyRecipe"><span class="lbl-long">Copy recipe</span><span class="lbl-short">Recipe</span></button>
       </div>
       <div class="status" id="status" role="status"></div>
+      </div>
+    </section>
+    <section class="spritepanel" aria-label="Game sprite">
+      <div class="spritehead">
+        <span class="glabel">Game sprite</span>
+        <p class="refnote">The in-game version of this character: same gender, hair, colours and outfit, in four directions with idle, walk and attack animations. Equipment shows on the sprite.</p>
+      </div>
+      <div class="spritebody">
+        <div class="spriteframe"><canvas id="sprite" width="48" height="48" aria-label="Animated game sprite"></canvas></div>
+        <div class="spritectl">
+          <div class="seg" id="spriteDir" role="group" aria-label="Direction">
+            <button data-dir="down" aria-pressed="true" aria-label="Facing down">&darr;</button>
+            <button data-dir="left" aria-pressed="false" aria-label="Facing left">&larr;</button>
+            <button data-dir="right" aria-pressed="false" aria-label="Facing right">&rarr;</button>
+            <button data-dir="up" aria-pressed="false" aria-label="Facing up">&uarr;</button>
+          </div>
+          <div class="seg" id="spriteAnim" role="group" aria-label="Animation">
+            <button data-anim="idle" aria-pressed="false">Idle</button>
+            <button data-anim="walk" aria-pressed="true">Walk</button>
+            <button data-anim="attack" aria-pressed="false">Attack</button>
+          </div>
+          <div class="gear" id="gear"></div>
+          <div class="tplrow">
+            <button id="saveSheet">Save sprite sheet</button>
+            <button id="saveSheetData">Save sheet data</button>
+          </div>
+        </div>
       </div>
     </section>
     <section class="refpanel" aria-label="Reference overlay">
@@ -496,34 +540,32 @@ const RIG = (function () {
   // Female faces narrow slightly below the eyes (rows 31-40), by a per-shape amount. "soft" is the
   // farm-sim style face: barely narrowed, a short full U-jaw and a broad rounded chin. It must always
   // stay available and soft; slimmer looks belong to the other shapes.
-  const FEM_TAPER = { soft: 0.3, round: 0.9, oval: 1.1, heart: 1.2 };
+  // Every shape is a small variation on Soft (v4.4): one shared skull and face plate, and jaws that
+  // differ by about a pixel in chin width and length. Shapes should read as the same family.
+  const FEM_TAPER = { soft: 0.3, round: 0.45, oval: 0.55, heart: 0.65, square: 0.2 };
   // [jaw length, chin half-width, taper exponent p, fullness q (lower = fuller cheeks)]
   const JAWS = {
-    masc: { soft: [7.4, 5.4, 2.2, 0.7], round: [7.6, 5.2, 2.2, 0.75], oval: [8.0, 4.2, 1.7, 0.95], heart: [8.2, 3.6, 1.35, 1.1] },
-    fem:  { soft: [7.5, 5.0, 2.1, 0.72], round: [7.8, 4.6, 2.0, 0.85], oval: [8.2, 3.8, 1.6, 1.0], heart: [8.4, 3.3, 1.35, 1.1] },
+    masc: { soft: [7.4, 5.4, 2.2, 0.7], round: [7.4, 5.0, 2.15, 0.74], oval: [7.9, 4.9, 2.1, 0.76], heart: [7.6, 4.5, 2.0, 0.8], square: [7.2, 6.0, 2.8, 0.62] },
+    fem:  { soft: [7.5, 5.0, 2.1, 0.72], round: [7.5, 4.7, 2.05, 0.75], oval: [7.9, 4.5, 2.0, 0.78], heart: [7.6, 4.2, 1.95, 0.82], square: [7.3, 5.6, 2.6, 0.66] },
   };
   function headHW(shape, y, sex) {
     const fem = sex === 'fem';
     const taper = fem ? (FEM_TAPER[shape] || 0) : 0;
     if (y < 22) {
-      const top = shape === 'oval' ? 8.0 : shape === 'square' ? 9.2 : 8.7;
+      // the crown is shared; only oval sits half a pixel taller
+      const top = shape === 'oval' ? 8.2 : 8.7;
       if (y < top) return 0;
       const t = (22 - y) / (22 - top);
-      if (shape === 'square') return 13.5 * Math.pow(1 - Math.pow(t, 3.4), 1 / 3.4);
-      if (shape === 'heart') return 13.9 * Math.pow(1 - Math.pow(t, 2.4), 1 / 2.4) - 0.4 * (1 - t);
+      if (shape === 'square') return 13.5 * Math.pow(1 - Math.pow(t, 2.3), 1 / 2.3);
       return 13.5 * Math.sqrt(1 - t * t);
     }
     if (y <= 40) return 13.5 - 1.5 * smooth(27, 40, y) - taper * smooth(31, 40, y);
     const j = y - 40, w0 = 12 - taper;
     // jaw tapers from the face plate to a rounded chin of half-width `chin`, closing over the last 2.2 rows
-    const JAW = JAWS[fem ? 'fem' : 'masc'][shape];
-    if (JAW) {
-      const [L, chin, p, q] = JAW, body = L - 2.2;
-      if (j > L) return 0;
-      if (j > body) return chin * Math.sqrt(Math.max(0, 1 - ((j - body) / 2.2) ** 2));
-      return chin + (w0 - chin) * Math.pow(Math.max(0, 1 - Math.pow(j / body, p)), q);
-    }
-    const L = 6.8; if (j > L) return 0; return 12 * Math.pow(1 - Math.pow(j / L, 5), 0.45) - (j > 3 ? (j - 3) * 0.35 : 0);
+    const [L, chin, p, q] = JAWS[fem ? 'fem' : 'masc'][shape] || JAWS[fem ? 'fem' : 'masc'].soft, body = L - 2.2;
+    if (j > L) return 0;
+    if (j > body) return chin * Math.sqrt(Math.max(0, 1 - ((j - body) / 2.2) ** 2));
+    return chin + (w0 - chin) * Math.pow(Math.max(0, 1 - Math.pow(j / body, p)), q);
   }
   function headMask(shape, sex) {
     const m = Mask();
@@ -632,10 +674,12 @@ const RIG = (function () {
     const base = state.build === 'broad' ? 6.6 : 5.6;
     return base + Math.max(0, y - 49.5) * Math.max(0, y - 49.5) * 0.42;
   }
+  // Female shoulders sit slightly lower (a softer slope); male shoulders keep the original line (v4.4)
+  function shoulderTop(state) { return state.sex === 'fem' ? 49.2 : 48.6; }
   function shoulderHW(state, y) {
-    const S = state.build === 'broad' ? 31 : 27.5;
-    if (y < 48.6) return 0;
-    return S * (1 - Math.exp(-(y - 48.6) / 3.1));
+    const S = state.build === 'broad' ? 31 : 27.5, top = shoulderTop(state);
+    if (y < top) return 0;
+    return S * (1 - Math.exp(-(y - top) / 3.1));
   }
   function drawNeck(ctx) {
     const { B, R, state } = ctx;
@@ -652,12 +696,20 @@ const RIG = (function () {
       if (Math.abs(dx) > hw - 1 && y < 50) t = 0;
       B.put(x, y, R.skin, Math.max(t, Math.abs(dx) > hw - 1 && y < 50 ? 0 : 1));
     }
+    // the groove between the collarbones, seen through open necklines: two pixels deep with a
+    // collarbone hint for men, one soft pixel for women (v4.4)
+    const masc = state.sex !== 'fem';
+    const notch = masc ? [[31, 51, -2], [32, 51, -2], [31, 52, -1], [32, 52, -1]] : [[31, 51, -1], [32, 51, -1]];
+    notch.forEach(([x, y, d]) => B.shift(x, y, d, [R.skin]));
+    if (masc) [-1, 1].forEach(dir => {
+      for (let k = 2; k <= 5; k++) B.shift(dir < 0 ? 31 - k : 32 + k, k < 4 ? 51 : 50, -1, [R.skin]);
+    });
   }
 
   function torsoNormal(state, x, y) {
     const S = state.build === 'broad' ? 31 : 27.5;
     const dx = x + 0.5 - CX, ad = Math.min(Math.abs(dx), S - 0.01);
-    const topY = 48.6 - 3.1 * Math.log(1 - ad / S);
+    const topY = shoulderTop(state) - 3.1 * Math.log(1 - ad / S);
     const dtop = y + 0.5 - topY;
     return norm3([dx / (S + 4), -0.95 * Math.exp(-dtop / 2.4), 0.9]);
   }
@@ -790,7 +842,7 @@ const RIG = (function () {
         if (!mget(cloth, x, y)) continue;
         const dx = x + 0.5 - CX, ad = Math.min(Math.abs(dx), (state.build === 'broad' ? 31 : 27.5) - 0.01);
         const S = state.build === 'broad' ? 31 : 27.5;
-        const topY = 48.6 - 3.1 * Math.log(1 - ad / S);
+        const topY = shoulderTop(state) - 3.1 * Math.log(1 - ad / S);
         const d = y + 0.5 - topY;
         if (d > 2.2 && d < 4.4 && Math.abs(dx) > 10) {
           const n = torsoNormal(state, x, y);
@@ -824,7 +876,7 @@ const RIG = (function () {
         if (!mget(cloth, x, y)) continue;
         const dx = x + 0.5 - CX, S = state.build === 'broad' ? 31 : 27.5;
         const ad = Math.min(Math.abs(dx), S - 0.01);
-        const d = y + 0.5 - (48.6 - 3.1 * Math.log(1 - ad / S));
+        const d = y + 0.5 - (shoulderTop(state) - 3.1 * Math.log(1 - ad / S));
         if (Math.abs(d - 3.2) < 0.5 && Math.abs(dx) > 11) B.put(x, y, R.glow, dx < 0 ? 4 : 3);
       }
       // chest panel seam
@@ -1523,6 +1575,32 @@ const RIG = (function () {
     },
   };
 
+  // Wet, matted long hair: a dark, flat scalp from a centre part and thin pointed clumps that cling
+  // to the face and neck, with sharp wet highlights at different heights on each clump.
+  HAIR.wet = {
+    name: 'Wet long',
+    build() {
+      const P = [32, 7.4];
+      const front = [cap(P, { hairline: x => { const ad = Math.abs(x - CX); return 15.6 + (ad < 1 ? -7.5 : 0) + (ad > 4.5 ? (ad - 4.5) ** 2 * 0.36 : 0); }, band: [7, 8.6], stripes: 30 })];
+      [-1, 1].forEach(d => {
+        const side = d > 0 ? -0.5 : 0, j = d > 0 ? 0.6 : 0; // small left/right differences so it isn't mirrored
+        // a parted clump over each temple
+        front.push(L([[CX + d * 1, 7.6], [CX + d * 7, 8.5], [CX + d * 10.5, 15], [CX + d * (10.6 + j), 23.5]], 2.6, 0.5, { tone: side - 0.4, sheen: [0.18, 0.3] }));
+        // clumps that cling to the cheek and jaw, then run down the neck
+        front.push(L([[CX + d * 3, 7.8], [CX + d * 12.5, 8.8], [CX + d * 14, 28], [CX + d * (11.8 + j), 52]], 2.8, 0.8, { tone: side - 0.5, sheen: [0.28, 0.42] }));
+        front.push(L([[CX + d * 5, 8.4], [CX + d * 14.6, 11], [CX + d * 15.6, 33], [CX + d * (13.8 - j), 60]], 2.6, 0.8, { tone: side - 0.7, sheen: [0.2, 0.33] }));
+        front.push(L([[CX + d * 7, 9], [CX + d * 16.4, 13.5], [CX + d * 17.2, 38], [CX + d * (16 + j), 65]], 2.6, 0.8, { tone: side - 0.6, sheen: [0.4, 0.48] }));
+        front.push(L([[CX + d * 9.5, 10.5], [CX + d * 18, 17], [CX + d * 18.6, 42], [CX + d * (18.4 - j), 66]], 2.2, 0.8, { tone: side - 0.9, sheen: [0.5, 0.57] }));
+      });
+      const back = [];
+      [-1, 1].forEach(d => {
+        back.push(L([[CX + d * 6, 14], [CX + d * 16, 18], [CX + d * 17, 40], [CX + d * 16, 63]], 5, 1.6, { tone: -0.9, sheen: [0, 0] }));
+        back.push(L([[CX + d * 4, 30], [CX + d * 10, 40], [CX + d * 11.5, 52], [CX + d * 11, 63]], 4, 1.2, { tone: -1.1, sheen: [0, 0] }));
+      });
+      return { back, front };
+    },
+  };
+
   function buildHair(ctx, def) { return def.build(ctx); }
 
   // Rasterize hair primitives into a temp list of {x,y,tone,prim} preserving painter order.
@@ -1698,8 +1776,15 @@ const RIG = (function () {
         }
       });
       for (let x = CX - 3; x <= CX + 2; x++) B.put(x, 29, w === 'shades' ? R.dark : R.gold, 2);
-      for (let x = 13; x <= 19; x++) B.put(x, 29, w === 'shades' ? R.dark : R.gold, 3);
-      for (let x = 44; x <= 50; x++) B.put(x, 29, w === 'shades' ? R.dark : R.gold, 1);
+      // temple arms run from the rim back to the ear, over skin only: they stop at the head's edge
+      // and tuck under any hair instead of floating past narrow faces
+      const SK = [R.skin, R.blush, R.stubble, R.stubbleDot];
+      [-1, 1].forEach(dir => {
+        for (let x = dir < 0 ? 19 : 44; x >= 0 && x < N; x += dir) {
+          if (!SK.includes(B.rid(x, 29))) break;
+          B.put(x, 29, w === 'shades' ? R.dark : R.gold, dir < 0 ? 3 : 1);
+        }
+      });
     }
     if (w === 'visor') {
       for (let y = 26; y < 34; y++) for (let x = 15; x < 49; x++) {
@@ -1895,7 +1980,7 @@ const RIG = (function () {
       allow: {
         skin: range(7), hairColor: range(7), eyeColor: [0, 1, 2, 3, 4, 6],
         ears: ['normal', 'small'],
-        hairStyle: ['bald', 'buzz', 'tousled', 'sidepart', 'spiky', 'bob', 'long', 'wavy', 'ponytail', 'buns', 'braid', 'curly', 'mohawk', 'mane', 'sleek'],
+        hairStyle: ['bald', 'buzz', 'tousled', 'sidepart', 'spiky', 'bob', 'long', 'wavy', 'ponytail', 'buns', 'braid', 'curly', 'mohawk', 'mane', 'sleek', 'wet'],
         lips: ['natural', 'rose', 'berry', 'coral', 'plum'],
         marks: ['none', 'freckles', 'mole', 'scar'],
         outfit: ['tee', 'sweater', 'buttonup', 'jacket', 'hoodie', 'turtleneck'],
@@ -1910,7 +1995,7 @@ const RIG = (function () {
       allow: {
         skin: range(7), hairColor: range(12), eyeColor: range(9),
         ears: ['normal', 'small'],
-        hairStyle: ['bald', 'buzz', 'tousled', 'sidepart', 'spiky', 'undercut', 'bob', 'long', 'ponytail', 'buns', 'braid', 'mohawk', 'mane', 'sleek'],
+        hairStyle: ['bald', 'buzz', 'tousled', 'sidepart', 'spiky', 'undercut', 'bob', 'long', 'ponytail', 'buns', 'braid', 'mohawk', 'mane', 'sleek', 'wet'],
         lips: ['natural', 'rose', 'berry', 'plum'],
         marks: ['none', 'freckles', 'scar', 'implant', 'circuit', 'stripes'],
         outfit: ['tee', 'jacket', 'hoodie', 'turtleneck', 'tech'],
@@ -1978,13 +2063,13 @@ const RIG = (function () {
   const SEX_WEIGHTS = {
     fem: {
       headShape: { soft: 3, round: 2, oval: 1.5, heart: 1.2 },
-      hairStyle: { long: 3, wavy: 3, bob: 3, ponytail: 3, buns: 2, braid: 2, curly: 2, tousled: 0.8, sidepart: 0.6, undercut: 0.6, mohawk: 0.3, sleek: 2.5, mane: 1.5 },
+      hairStyle: { long: 3, wavy: 3, bob: 3, ponytail: 3, buns: 2, braid: 2, curly: 2, tousled: 0.8, sidepart: 0.6, undercut: 0.6, mohawk: 0.3, sleek: 2.5, mane: 1.5, wet: 1.5 },
       mouthStyle: { lips: 2.5 }, lips: { natural: 3, rose: 1.5, berry: 1, coral: 1.2, plum: 0.6 },
       extra: { none: 5, earrings: 3.5, flower: 1.2 },
     },
     masc: {
       headShape: { square: 2.5, round: 2, oval: 1.5, soft: 1 },
-      hairStyle: { tousled: 3, sidepart: 3, spiky: 2, buzz: 2, undercut: 2, curly: 1.5, long: 0.6, ponytail: 0.5, mohawk: 0.6, bald: 0.8, mane: 1.5, sleek: 1.2 },
+      hairStyle: { tousled: 3, sidepart: 3, spiky: 2, buzz: 2, undercut: 2, curly: 1.5, long: 0.6, ponytail: 0.5, mohawk: 0.6, bald: 0.8, mane: 1.5, sleek: 1.2, wet: 1 },
       extra: { none: 7, earrings: 0.8 },
     },
   };
@@ -2025,6 +2110,961 @@ const RIG = (function () {
   return { N, render, draw, toImageData, OPTIONS, PALETTE, HAIR, randomState, BACKDROPS, WORLDS, allowed, fitWorld, fit, SEX_TAGS, SEX_WEIGHTS, makeRamp, SPECS: { SKIN_SPEC, HAIR_SPEC, CLOTH_SPEC, IRIS_SPEC, METAL_SPEC } };
 })();
 if (typeof module !== 'undefined') module.exports = RIG;
+
+// Sprite rig: top-down game sprites built from the same recipe as a portrait.
+// 48x48 frames, four directions (down, left, right, up), idle / walk / attack, with equipment
+// layers (weapon, head, body, hands, feet, back) so upgrades show on the character.
+// Needs RIG (src/rig.js) for the palettes and colour ramps, so portrait and sprite always match.
+const SPRITE = (function (RIG) {
+  const W = 48, H = 48, CX = 24, FOOT = 46;
+  const INK = [24, 16, 34]; // outline colour: a deep violet-black, mixed into each part's darkest tone
+  const DIRS = ['down', 'left', 'right', 'up'];
+  const ANIMS = { idle: { frames: 2, fps: 2 }, walk: { frames: 6, fps: 10 }, attack: { frames: 4, fps: 12 } };
+  const { SKIN_SPEC, HAIR_SPEC, CLOTH_SPEC, METAL_SPEC } = RIG.SPECS;
+  const PAL = RIG.PALETTE;
+
+  // ---------- small helpers ----------
+  const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
+  const lerp = (a, b, t) => a + (b - a) * t;
+  const mixRgb = (a, b, t) => [0, 1, 2].map(k => Math.round(lerp(a[k], b[k], t)));
+  const mixRamp = (ra, rb, t) => ra.map((c, i) => mixRgb(c, rb[Math.min(i, rb.length - 1)], t));
+  const hash = (x, y, s) => { let h = (x * 374761393 + y * 668265263 + s * 982451653) | 0; h = Math.imul(h ^ (h >>> 13), 1274126177); return ((h ^ (h >>> 16)) >>> 0) / 4294967296; };
+  const rad = d => d * Math.PI / 180;
+
+  // ---------- canvas ----------
+  // Geometry is written for the down, up and left views; the right view is the left view
+  // mirrored at rasterization time, and shading is applied afterwards in screen space so the
+  // light still comes from the top left.
+  function Canvas(flip) {
+    this.flip = flip;
+    this.rid = new Int16Array(W * H).fill(-1);
+    this.tone = new Int8Array(W * H);
+    this.keep = new Uint8Array(W * H); // pixels the silhouette outline must not darken
+    this.ink = new Float32Array(W * H); // 0..1 mix toward the ink colour (outlines and seams)
+    this.ov = new Float32Array(W * H * 4);
+    this.ramps = [];
+  }
+  Canvas.prototype.reg = function (r) { this.ramps.push(r); return this.ramps.length - 1; };
+  Canvas.prototype.sx = function (gx) { return this.flip ? W - 1 - gx : gx; };
+  Canvas.prototype.mask = function (fn) {
+    const m = new Uint8Array(W * H);
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      const gx = this.flip ? W - (x + 0.5) : x + 0.5;
+      if (fn(gx, y + 0.5)) m[y * W + x] = 1;
+    }
+    return m;
+  };
+  Canvas.prototype.opaque = function (x, y) { return x >= 0 && y >= 0 && x < W && y < H && this.rid[y * W + x] >= 0; };
+  Canvas.prototype.set = function (x, y, rid, tone, keep) {
+    if (x < 0 || y < 0 || x >= W || y >= H) return;
+    const i = y * W + x;
+    this.rid[i] = rid; this.tone[i] = clamp(Math.round(tone), 0, this.ramps[rid].length - 1);
+    this.keep[i] = keep ? 1 : 0;
+    this.ink[i] = 0;
+  };
+  // put / shift / get take geometry coordinates (mirrored for the right view)
+  Canvas.prototype.put = function (gx, gy, rid, tone, keep) { this.set(this.sx(gx), gy, rid, tone, keep); };
+  Canvas.prototype.shift = function (gx, gy, d, only) {
+    const x = this.sx(gx); if (x < 0 || gy < 0 || x >= W || gy >= H) return;
+    const i = gy * W + x, r = this.rid[i];
+    if (r < 0 || (only && !only.includes(r))) return;
+    this.tone[i] = clamp(this.tone[i] + d, 0, this.ramps[r].length - 1);
+  };
+  Canvas.prototype.ridAt = function (gx, gy) { const x = this.sx(gx); return x < 0 || gy < 0 || x >= W || gy >= H ? -1 : this.rid[gy * W + x]; };
+  Canvas.prototype.retint = function (gx, gy, from, to) { const x = this.sx(gx); if (x < 0 || gy < 0 || x >= W || gy >= H) return; const i = gy * W + x; if (from.includes(this.rid[i])) this.rid[i] = to; };
+  Canvas.prototype.glow = function (gx, gy, rgb, a) {
+    const x = this.sx(gx); if (x < 0 || gy < 0 || x >= W || gy >= H) return;
+    const o = (gy * W + x) * 4, ex = this.ov[o + 3], na = a + ex * (1 - a);
+    for (let k = 0; k < 3; k++) this.ov[o + k] = (rgb[k] * a + this.ov[o + k] * ex * (1 - a)) / na;
+    this.ov[o + 3] = na;
+  };
+
+  // Paint a mask with round (cylinder) shading: each pixel's normal comes from where it sits in
+  // its own row and column run. base = the ramp's mid tone; k = contrast.
+  // Edges that overlap something already painted get a soft line on their shadow side only.
+  Canvas.prototype.paint = function (m, rid, o) {
+    o = o || {};
+    const base = o.base != null ? o.base : 3, k = o.k != null ? o.k : 1.5, len = this.ramps[rid].length;
+    const lo = o.min != null ? o.min : 1;
+    const inM = (x, y) => x >= 0 && y >= 0 && x < W && y < H && m[y * W + x];
+    const out = [];
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      if (!m[y * W + x]) continue;
+      let a = x, b = x; while (inM(a - 1, y)) a--; while (inM(b + 1, y)) b++;
+      let c = y, d = y; while (inM(x, c - 1)) c--; while (inM(x, d + 1)) d++;
+      const nx = (x + 0.5 - (a + b + 1) / 2) / Math.max(1, (b - a + 1) / 2);
+      const ny = (y + 0.5 - (c + d + 1) / 2) / Math.max(1, (d - c + 1) / 2);
+      const I = o.flat ? 0 : -0.62 * nx - (o.vy != null ? o.vy : 0.38) * ny;
+      let t = base + Math.round(I * k), ink = 0;
+      if (o.inner !== false) {
+        const rEdge = !inM(x + 1, y) && this.opaque(x + 1, y), bEdge = !inM(x, y + 1) && this.opaque(x, y + 1);
+        if (rEdge || bEdge) { t = Math.min(t, o.innerTone != null ? o.innerTone : 1); ink = o.innerInk != null ? o.innerInk : 0.45; }
+        else if (o.innerAll && ((!inM(x - 1, y) && this.opaque(x - 1, y)) || (!inM(x, y - 1) && this.opaque(x, y - 1)))) { t = Math.min(t, 2); ink = 0.3; }
+      }
+      out.push([x, y, clamp(t, lo, len - 1), ink]);
+    }
+    for (const [x, y, t, ink] of out) { this.set(x, y, rid, t, o.keep); this.ink[y * W + x] = ink; }
+    return m;
+  };
+  // Silhouette outline: darkest tone where the outside is right or below, a softer tone where
+  // it is left or above (the portrait rule, so sprites read as soft as the faces).
+  Canvas.prototype.outline = function () {
+    const out = [];
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      const i = y * W + x;
+      if (this.rid[i] < 0 || this.keep[i]) continue;
+      const r = !this.opaque(x + 1, y), b = !this.opaque(x, y + 1), l = !this.opaque(x - 1, y), u = !this.opaque(x, y - 1);
+      if (r || b) out.push([i, 0, 0.72]); else if (l || u) out.push([i, Math.min(this.tone[i], 1), 0.5]);
+    }
+    for (const [i, t, ink] of out) { this.tone[i] = t; this.ink[i] = Math.max(this.ink[i], ink); }
+  };
+  Canvas.prototype.toRGBA = function (target, tw, ox, oy) {
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      const i = y * W + x, r = this.rid[i];
+      if (r < 0) continue;
+      let c = this.ramps[r][this.tone[i]];
+      if (this.ink[i] > 0) c = mixRgb(c, INK, this.ink[i]);
+      const oa = this.ov[i * 4 + 3];
+      if (oa > 0) c = mixRgb(c, [this.ov[i * 4], this.ov[i * 4 + 1], this.ov[i * 4 + 2]], oa);
+      const o = ((oy + y) * tw + ox + x) * 4;
+      target[o] = c[0]; target[o + 1] = c[1]; target[o + 2] = c[2]; target[o + 3] = 255;
+    }
+  };
+
+  // ---------- shapes (geometry space) ----------
+  const ell = (cx, cy, rx, ry) => (x, y) => ((x - cx) / rx) ** 2 + ((y - cy) / ry) ** 2 < 1;
+  const rect = (x0, y0, x1, y1) => (x, y) => x >= x0 && x < x1 && y >= y0 && y < y1;
+  function segDist(px, py, ax, ay, bx, by) {
+    const vx = bx - ax, vy = by - ay, l2 = vx * vx + vy * vy || 1;
+    const t = clamp(((px - ax) * vx + (py - ay) * vy) / l2, 0, 1);
+    return Math.hypot(px - ax - vx * t, py - ay - vy * t);
+  }
+  const cap = (pts, r) => (x, y) => { for (let i = 0; i < pts.length - 1; i++) if (segDist(x, y, pts[i][0], pts[i][1], pts[i + 1][0], pts[i + 1][1]) < r) return true; return false; };
+  const or = (...fs) => (x, y) => fs.some(f => f && f(x, y));
+  const and = (...fs) => (x, y) => fs.every(f => f(x, y));
+  const not = f => (x, y) => !f(x, y);
+  const bump = (v, c, w) => Math.max(0, 1 - ((v - c) / w) ** 2); // 1 at c, 0 beyond ±w
+
+  // ---------- equipment ----------
+  // Every slot lists its items in order; options are appended, never inserted (recipes store names).
+  // `tier` is how far up the upgrade path an item sits (drives material and trim).
+  const GEAR = {
+    weapon: {
+      none:          { name: 'Fists' },
+      pipe:          { name: 'Lead pipe', len: 10, kind: 'pipe', tier: 0 },
+      utility_knife: { name: 'Utility knife', len: 6, kind: 'blade', tier: 0 },
+      combat_blade:  { name: 'Combat blade', len: 10, kind: 'blade', tier: 1 },
+      spire_blade:   { name: 'Spire blade', len: 13, kind: 'blade', tier: 2, glow: '#ff4d6d' },
+      shock_baton:   { name: 'Shock baton', len: 10, kind: 'baton', tier: 1, glow: '#4fd8ff' },
+      wrench:        { name: 'Wrench', len: 9, kind: 'wrench', tier: 0 },
+      energy_blade:  { name: 'Energy blade', len: 13, kind: 'blade', tier: 2, glow: '#7dffcf' },
+    },
+    head: {
+      none:       { name: 'None' },
+      beanie:     { name: 'Beanie' },
+      goggles:    { name: 'Goggles' },
+      respirator: { name: 'Respirator' },
+      helmet:     { name: 'Riot helmet', tier: 2 },
+      hood:       { name: 'Cloak hood' },
+    },
+    body: {
+      none:         { name: 'Outfit only' },
+      thermal_wrap: { name: 'Thermal wrap', tier: 0 },
+      body_armor:   { name: 'Body armor', tier: 1 },
+      hardplate:    { name: 'Hardplate', tier: 2 },
+      cloak:        { name: 'Biometric cloak', tier: 1 },
+      longcoat:     { name: 'Long coat', tier: 1 },
+    },
+    hands: {
+      none:      { name: 'Bare' },
+      gloves:    { name: 'Fingerless gloves' },
+      gauntlets: { name: 'Plated gauntlets', tier: 2 },
+      neural:    { name: 'Neural jack arm', tier: 2, glow: '#3fd6e0' },
+    },
+    feet: {
+      shoes:    { name: 'Shoes' },
+      boots:    { name: 'Work boots' },
+      armored:  { name: 'Armored boots', tier: 2 },
+    },
+    back: {
+      none:     { name: 'None' },
+      backpack: { name: 'Backpack' },
+      sling:    { name: 'Sling bag' },
+      tank:     { name: 'Power cell pack', glow: '#3fd6e0' },
+    },
+  };
+  const SLOTS = Object.keys(GEAR);
+  function gearOf(state) {
+    const g = Object.assign({}, state.gear || {});
+    for (const s of SLOTS) if (!GEAR[s][g[s]]) g[s] = s === 'feet' ? 'shoes' : 'none';
+    return g;
+  }
+
+  // ---------- hair: each portrait style mapped to sprite parts ----------
+  // cap: none | buzz | full | mohawk | undercut;  len: 0 short, 1 ear, 2 bob, 3 long, 4 mane
+  const HAIR = {
+    bald:     { cap: 'none' },
+    buzz:     { cap: 'buzz' },
+    tousled:  { cap: 'full', vol: 2, fringe: 'tufts', len: 0 },
+    sidepart: { cap: 'full', vol: 1, fringe: 'side', len: 0 },
+    spiky:    { cap: 'full', fringe: 'tufts', len: 0, spikes: true },
+    undercut: { cap: 'undercut', fringe: 'side', len: 0 },
+    bob:      { cap: 'full', vol: 1, fringe: 'bangs', len: 2 },
+    long:     { cap: 'full', fringe: 'part', len: 3 },
+    wavy:     { cap: 'full', fringe: 'part', len: 1, tails: 'pigtails' },
+    ponytail: { cap: 'full', fringe: 'side', len: 0, tails: 'pony' },
+    buns:     { cap: 'full', fringe: 'bangs', len: 1, tails: 'buns' },
+    braid:    { cap: 'full', fringe: 'part', len: 1, tails: 'braid' },
+    curly:    { cap: 'full', vol: 2, fringe: 'curls', len: 2, curly: true },
+    mohawk:   { cap: 'mohawk' },
+    mane:     { cap: 'full', vol: 2, fringe: 'part', len: 4 },
+    sleek:    { cap: 'full', fringe: 'part', len: 3, sleek: true },
+    wet:      { cap: 'full', fringe: 'part', len: 3, wet: true },   // thin, dark, clinging clumps
+  };
+  const HAIR_END = [18.5, 21.5, 24.5, 32, 36.5];
+
+  // ---------- body proportions ----------
+  function bodyOf(state) {
+    const fem = state.sex === 'fem', broad = state.build === 'broad';
+    return {
+      fem,
+      sw: fem ? (broad ? 5.4 : 4.9) : (broad ? 6.1 : 5.5),   // shoulder half-width (front)
+      waist: fem ? 4.1 : broad ? 5.3 : 4.8,
+      hip: fem ? 5.0 : broad ? 5.2 : 4.8,
+      depth: fem ? 3.7 : broad ? 4.4 : 4.0,                 // half depth in profile
+      legX: fem ? 2.1 : 2.3,
+    };
+  }
+  function torsoHW(B, y) { // front view, y relative to the body (no bob)
+    if (y < 25.6 || y > 36.5) return 0;
+    if (y < 28.4) { const t = (28.4 - y) / 2.8; return B.sw - 2.7 * t * t; } // round shoulder caps
+    if (y < 30) return B.sw;
+    if (y < 33.5) return lerp(B.sw, B.waist, (y - 30) / 3.5);
+    return lerp(B.waist, B.hip, clamp((y - 33.5) / 2, 0, 1));
+  }
+
+  // ---------- ramps ----------
+  function ramps(C, state, gear) {
+    const R = {};
+    R.skin = C.reg(RIG.makeRamp(PAL.skin[state.skin] || PAL.skin[1], SKIN_SPEC, 22, 95));
+    const skin = C.ramps[R.skin];
+    R.blush = C.reg(mixRamp(skin, RIG.makeRamp('#e8707a', SKIN_SPEC, 15, 80), 0.32));
+    R.hair = C.reg(RIG.makeRamp(PAL.hair[state.hairColor] || PAL.hair[1], HAIR_SPEC, 300, 100));
+    const hair = C.ramps[R.hair];
+    R.stubble = C.reg(mixRamp(skin, hair.slice(1), 0.4));
+    R.iris = C.reg(RIG.makeRamp(PAL.eye[state.eyeColor] || PAL.eye[0], RIG.SPECS.IRIS_SPEC, 290, 100));
+    R.ink = C.reg([mixRgb(skin[0], hair[0], 0.6), mixRgb(skin[0], [30, 24, 34], 0.5), mixRgb(skin[1], hair[1], 0.5)]);
+    const lip = PAL.lips[state.lips || 'natural'];
+    R.lip = C.reg(lip ? RIG.makeRamp(lip, SKIN_SPEC, 0, 60) : mixRamp(skin, RIG.makeRamp('#c86070', SKIN_SPEC, 0, 60), 0.4));
+    R.cloth = C.reg(RIG.makeRamp(PAL.cloth[state.outfitColor] || PAL.cloth[0], CLOTH_SPEC, 295, 100));
+    R.accent = C.reg(RIG.makeRamp(PAL.cloth[state.accentColor] || PAL.cloth[1], CLOTH_SPEC, 295, 100));
+    const jumpsuit = state.outfit === 'tech' || state.outfit === 'flight';
+    R.pants = jumpsuit ? R.cloth : C.reg(RIG.makeRamp(state.world === 'country' ? '#44506e' : '#34323f', CLOTH_SPEC, 295, 100));
+    R.shoe = C.reg(RIG.makeRamp('#4a3a32', CLOTH_SPEC, 300, 90));
+    R.leather = C.reg(RIG.makeRamp('#6b4a34', CLOTH_SPEC, 300, 90));
+    R.dark = C.reg(RIG.makeRamp('#2f2d38', CLOTH_SPEC, 295, 100));
+    R.white = C.reg(RIG.makeRamp('#efe9df', CLOTH_SPEC, 280, 100));
+    R.gold = C.reg(RIG.makeRamp('#d9a441', METAL_SPEC, 35, 105));
+    R.steel = C.reg(RIG.makeRamp('#8c96a8', METAL_SPEC, 280, 100));
+    R.gun = C.reg(RIG.makeRamp('#5d6272', METAL_SPEC, 280, 100));
+    R.rust = C.reg(RIG.makeRamp('#8a6a5a', METAL_SPEC, 20, 90));
+    R.olive = C.reg(RIG.makeRamp('#5e6648', CLOTH_SPEC, 295, 100));
+    R.glowC = state.glow || '#3fd6e0';
+    R.glow = C.reg(RIG.makeRamp(R.glowC, [[-0.7, 20, 1], [-0.4, 14, 1.05], [-0.15, 6, 1.05], [0, 0, 1.05], [0.3, 6, 0.9], [0.6, 10, 0.55]], 280, 100));
+    const wg = GEAR.weapon[gear.weapon];
+    if (wg && wg.glow) R.wglow = C.reg(RIG.makeRamp(wg.glow, [[-0.6, 20, 1], [-0.35, 14, 1.05], [-0.12, 6, 1.05], [0, 0, 1.05], [0.32, 6, 0.8], [0.62, 10, 0.4]], 280, 100));
+    return R;
+  }
+
+  // ---------- pose ----------
+  // Everything the parts need to know about one frame: bob, leg and arm positions, weapon angle.
+  function pose(state, view, anim, f, gear) {
+    const B = bodyOf(state);
+    const P = { b: 0, lift: [0, 0], swing: [0, 0], foot: [0, 0], lean: 0, weapon: null, punch: 0 };
+    if (anim === 'idle') { P.b = f % 2; if (view === 'left') P.foot = [-0.9, 0.9]; }
+    if (anim === 'walk') {
+      const p = (f / 6) * Math.PI * 2, s = Math.sin(p), c = Math.cos(p);
+      P.b = Math.abs(c) > 0.7 ? 1 : 0;
+      if (view === 'left') {
+        P.foot = [-3.6 * s, 3.6 * s];
+        P.lift = [c > 0.2 ? 2.2 * c : 0, c < -0.2 ? -2.2 * c : 0];
+        P.swing = [3 * s, -3 * s];
+      } else {
+        P.lift = [s > 0.2 ? 2 * s : 0, s < -0.2 ? -2 * s : 0];
+        P.swing = [-s, s];
+      }
+    }
+    if (anim === 'attack') {
+      // Zelda-style arc through the facing direction: wind-up, two slash frames, follow-through.
+      // Angles are screen degrees (0 right, 90 down) for the down, up and left views.
+      const ARC = { down: [-25, 35, 95, 150], up: [160, 215, 270, 330], left: [285, 225, 165, 125] };
+      P.angle = ARC[view][f];
+      P.prev = f > 0 ? ARC[view][f - 1] : null;
+      P.smear = f === 2 ? 1 : f === 3 ? 0.5 : 0;
+      P.lean = [-1, 1, 1, 0][f];
+      P.b = f === 0 ? 0 : f === 3 ? 1 : 0;
+      P.punch = gear.weapon === 'none' ? [0, 2, 4, 1][f] : 0;
+      if (view === 'left') { P.foot = [-2, 2]; } else { P.lift = [0, 0]; }
+    }
+    return Object.assign(P, { B });
+  }
+
+  // ---------- part painters ----------
+  // Head silhouettes are drawn from row tables (half-widths per pixel row from HEAD_TOP down), like
+  // a pixel artist would lay them out: a broad crown that is rounded but not domed, full cheeks, a
+  // soft U-shaped jaw and a broad rounded chin. Women's jaws narrow a little more toward the chin.
+  const HEAD_FRONT = {
+    masc: [4.0, 5.9, 6.7, 7.2, 7.4, 7.5, 7.5, 7.5, 7.5, 7.5, 7.3, 7.0, 6.5, 5.7, 4.4, 2.2],
+    fem:  [4.0, 5.9, 6.7, 7.2, 7.4, 7.5, 7.5, 7.5, 7.5, 7.4, 7.1, 6.7, 6.1, 5.2, 3.9, 1.8],
+  };
+  // profile facing left: how far the face reaches in front of x = 24.6, and the back of the head
+  // and jaw behind it (the jaw runs diagonally up to the ear, so it meets the neck at a soft angle)
+  const HEAD_SIDE = {
+    front: [2.8, 5.0, 6.1, 6.7, 7.0, 7.1, 7.0, 6.9, 7.2, 7.8, 7.1, 6.8, 6.4, 5.8, 4.6, 2.4],
+    back:  [4.4, 6.5, 7.3, 7.7, 7.8, 7.8, 7.6, 7.3, 7.0, 6.5, 5.6, 4.3, 2.8, 1.4, 0.2, -1],
+  };
+  const HEAD_TOP = 10.5; // first row of the tables: a broad, gently rounded crown, not a tall dome
+  const rowLerp = (t, yy) => { if (yy < -0.5 || yy > t.length - 0.5) return -1; const i = clamp(yy, 0, t.length - 1), k = Math.floor(i), f = i - k; return lerp(t[k], t[Math.min(k + 1, t.length - 1)], f); };
+  function headFront(B, b) {
+    const t = HEAD_FRONT[B.fem ? 'fem' : 'masc'];
+    return (x, y) => { const w = rowLerp(t, y - b - HEAD_TOP); return w > 0 && Math.abs(x - CX) < w + 0.05; };
+  }
+  function headSide(B, b) {
+    return (x, y) => {
+      const yy = y - b - HEAD_TOP, f = rowLerp(HEAD_SIDE.front, yy), k = rowLerp(HEAD_SIDE.back, yy);
+      if (f < 0 && k < 0) return false;
+      return x > 24.6 - f && x < 24.6 + k;
+    };
+  }
+
+  function drawLegs(C, R, P, view, gear) {
+    const B = P.B, boots = gear.feet !== 'shoes';
+    const shoeR = gear.feet === 'armored' ? R.gun : boots ? R.leather : R.shoe;
+    const pantsTop = 33.6;
+    if (view === 'left') {
+      const hip = [24.6 + P.lean, 35.4];
+      const legs = [1, 0].map(i => { // far leg first
+        const fx = 24.6 + P.foot[i] + P.lean * 0.5, ly = FOOT - 2.4 - P.lift[i];
+        const knee = [(hip[0] + fx) / 2 - P.lift[i] * 0.9 - 0.4, (hip[1] + ly) / 2 + 0.2];
+        return { i, fx, ly, knee };
+      });
+      for (const L of legs) {
+        const m = C.mask(or(cap([[hip[0], hip[1]], L.knee], 2.2), cap([L.knee, [L.fx, L.ly]], 1.75))); // thigh tapering to the ankle
+        C.paint(m, R.pants, { base: L.i === 1 ? 2 : 3 });
+        const top = boots ? L.ly - 2.6 : L.ly - 0.6;
+        const sm = C.mask(or(and(ell(L.fx - 0.9, L.ly + 1.2, 3.2, 1.7), (x, y) => y < L.ly + 2.4), and(rect(L.fx - 1.9, top, L.fx + 1.9, L.ly + 1.4), (x, y) => true)));
+        C.paint(sm, shoeR, { base: L.i === 1 ? 2 : 3, k: 1.2 });
+        if (gear.feet === 'armored') for (let y = Math.ceil(top); y < L.ly; y++) C.put(Math.round(L.fx - 1.6), y, R.steel, 4);
+      }
+      C.paint(C.mask(or(rect(20.8 + P.lean, pantsTop, 28.6 + P.lean, 35.6), ell(24.7 + P.lean, 35.4, 3.9, 2))), R.pants, {});
+      return;
+    }
+    const hipM = C.mask((x, y) => y >= pantsTop && y < 37.2 && Math.abs(x - CX) < torsoHW(B, Math.min(y, 36.4)) + 0.2);
+    for (const side of [-1, 1]) {
+      const i = side < 0 ? 0 : 1, lx = CX + side * B.legX, lift = P.lift[i];
+      const end = FOOT - 2.2 - lift;
+      C.paint(C.mask((x, y) => y >= 35.5 && y < end && Math.abs(x - lx) < lerp(2.15, 1.75, clamp((y - 37) / (end - 37), 0, 1))), R.pants, { base: lift > 0.5 ? 2 : 3 });
+      for (let y = 37; y < Math.floor(end) - 1; y++) { C.shift(Math.round(lx - 1.5), y, 1, [R.pants]); if (y > 39) C.shift(Math.round(lx + 0.5), y, -1, [R.pants]); }
+      const top = boots ? end - 2.5 : end - 0.4;
+      const sm = C.mask(or(ell(lx, end + 0.9, 2.5, 1.6), rect(lx - 2.3, top, lx + 2.3, end + 1)));
+      C.paint(sm, shoeR, { k: 1.2 });
+      if (gear.feet === 'armored') { C.put(Math.round(lx - 0.5), Math.round(top) + 1, R.steel, 4); C.put(Math.round(lx - 0.5), Math.round(top), R.steel, 3); }
+      C.shift(Math.round(lx - 1.5), Math.round(end) + 0, 2, [shoeR]);
+    }
+    C.paint(hipM, R.pants, {});
+  }
+
+  function sleeveLen(state) { return state.outfit === 'tee' ? 30.2 : 99; }
+
+  function armPts(P, view, which) { // which: 0 = weapon arm (character's right), 1 = other
+    const B = P.B, b = P.b;
+    if (view === 'left') {
+      const sh = [24.4 + P.lean, 27.4 + b];
+      if (which === 0 && P.angle != null) {
+        const a = rad(P.angle), r = 6.2 + P.punch * 0.6;
+        return [sh, [sh[0] + Math.cos(a) * r * 0.55, sh[1] + Math.sin(a) * r * 0.55 + 0.6], [sh[0] + Math.cos(a) * r, sh[1] + Math.sin(a) * r]];
+      }
+      const hx = sh[0] + P.swing[which] * 0.9, hy = 33.6 + b;
+      return [sh, [(sh[0] + hx) / 2 + 0.3, (sh[1] + hy) / 2], [hx, hy]];
+    }
+    // front/back: the weapon arm is screen-left facing down, screen-right facing up
+    const side = (view === 'down' ? -1 : 1) * (which === 0 ? 1 : -1);
+    const sh = [CX + side * (B.sw - 1), 28.9 + b]; // tucked under the round shoulder cap
+    if (which === 0 && P.angle != null) {
+      const a = rad(P.angle), r = 6.4 + P.punch * 0.6;
+      const piv = [CX + side * 2.2, 29 + b];
+      return [sh, [piv[0] + Math.cos(a) * r * 0.5, piv[1] + Math.sin(a) * r * 0.5], [piv[0] + Math.cos(a) * r, piv[1] + Math.sin(a) * r]];
+    }
+    const hy = 34 + b + P.swing[which === 0 ? 0 : 1];
+    return [sh, [CX + side * (B.sw - 0.2), (sh[1] + hy) / 2 + 0.4], [CX + side * (B.sw + 0.1), hy]];
+  }
+
+  function drawArm(C, R, P, view, which, state, gear) {
+    const pts = armPts(P, view, which), far = view === 'left' && which === 1;
+    const hand = pts[2], sl = sleeveLen(state);
+    const armM = C.mask(cap(pts.slice(0, 2).concat([[lerp(pts[1][0], hand[0], 0.75), lerp(pts[1][1], hand[1], 0.75)]]), 1.7));
+    const coat = gear.body === 'longcoat' || gear.body === 'cloak';
+    const sleeveRid = gear.body === 'longcoat' ? R.olive : gear.body === 'cloak' ? R.dark : R.cloth;
+    const sm = new Uint8Array(W * H), km = new Uint8Array(W * H), sleeveEnd = (coat ? 99 : sl) + P.b;
+    for (let i = 0; i < W * H; i++) { if (!armM[i]) continue; if (Math.floor(i / W) + 0.5 < sleeveEnd) sm[i] = 1; else km[i] = 1; }
+    const ab = far ? 2 : view === 'left' ? 4 : 3;
+    C.paint(km, R.skin, { base: ab, innerAll: true, innerInk: 0.6 });
+    C.paint(sm, sleeveRid, { base: ab, innerAll: true, innerInk: 0.6 });
+    // the shoulder joint flows into the torso: no seam line across the top of the arm
+    if (view !== 'left') for (let i = 0; i < W * H; i++) if (armM[i] && Math.floor(i / W) + 0.5 < pts[0][1] + 0.6) { C.ink[i] = 0; C.tone[i] = Math.max(C.tone[i], 3); }
+    for (let i = 0; i < W * H; i++) if (sm[i] && (i + W >= W * H || km[i + W] || (!sm[i + W] && !armM[i + W]))) { C.tone[i] = Math.max(1, C.tone[i] - 1); C.ink[i] = Math.max(C.ink[i], 0.2); }
+    // hand
+    const handRid = gear.hands === 'gloves' ? R.dark : gear.hands === 'gauntlets' ? R.steel : R.skin;
+    const hm = C.mask(ell(hand[0], hand[1] + 0.2, 1.6, 1.6));
+    C.paint(hm, handRid, { base: far ? 2 : 3, k: 1, innerAll: true });
+    if (gear.hands === 'gloves') C.put(Math.round(hand[0]), Math.round(hand[1] + 0.4), R.skin, 3);
+    if (gear.hands === 'neural' && which === 0) {
+      const fore = C.mask(cap([pts[1], hand], 1.6));
+      C.paint(fore, R.gun, { base: 3 });
+      for (let i = 0; i < W * H; i++) if (fore[i] && ((i % W) + Math.floor(i / W)) % 3 === 0) { const x = i % W, y = Math.floor(i / W); C.set(x, y, R.glow, 4, false); }
+    }
+    if (gear.hands === 'gauntlets') { C.paint(C.mask(cap([[lerp(pts[1][0], hand[0], 0.35), lerp(pts[1][1], hand[1], 0.35)], hand], 1.7)), R.steel, { base: 3 }); }
+  }
+
+  function drawTorso(C, R, P, view, state, gear) {
+    const B = P.B, b = P.b, o = state.outfit;
+    let m;
+    if (view === 'left') {
+      const cx = 24.6 + P.lean;
+      m = C.mask((x, y) => {
+        const yy = y - b; if (yy < 25.6 || yy > 35) return false;
+        // a gentle S: chest forward, shoulder blades back, the small of the back tucked in
+        let front = B.depth - 0.5 * bump(yy, 33, 2.2), back = B.depth + 0.3 * bump(yy, 28.6, 1.6) - 0.6 * bump(yy, 32.2, 1.6) + 0.2 * bump(yy, 34.8, 1);
+        if (B.fem) front += 0.6 * bump(yy, 29, 1.8);
+        if (yy < 28.2) { const t = (28.2 - yy) / 2.6; front -= 2.4 * t * t; back -= 2.2 * t * t; }
+        return x > cx - front && x < cx + back;
+      });
+    } else m = C.mask((x, y) => Math.abs(x - CX) < torsoHW(B, y - b) && y - b < 35);
+    C.paint(m, R.cloth, { base: 3 });
+    // belt
+    for (let x = 0; x < W; x++) if (C.ridAt(x, 34 + b) === R.cloth) C.put(x, 34 + b, o === 'tech' || o === 'flight' ? R.gun : R.leather, 2);
+    if (view === 'down') { C.put(23, 34 + b, R.gold, 3); C.put(24, 34 + b, R.gold, 2); }
+    if (view === 'left') C.put(Math.round(24.6 + P.lean - B.depth + 1), 34 + b, R.gold, 3);
+    // a fold under each arm and a soft chest highlight
+    if (view !== 'left') for (let y = 29; y < 34; y++) { C.shift(Math.round(CX - B.waist + 1), y + b, -1, [R.cloth]); C.shift(Math.round(CX + B.waist - 1.5), y + b, -1, [R.cloth]); }
+    if (view === 'down') for (const [x, y] of [[21, 27], [22, 27], [21, 28]]) C.shift(x, y + b, 1, [R.cloth]);
+    if (view === 'up') {
+      if (o === 'hoodie') C.paint(C.mask(ell(CX, 26.6 + b, 4.4, 1.8)), R.cloth, { base: 2 });
+      return m;
+    }
+    const front = view === 'down';
+    const nx = view === 'left' ? 24.6 + P.lean - B.depth + 0.6 : CX;
+    // necklines and details (front view gets the full set, the side view a hint)
+    if (front) {
+      if (o === 'tee' || o === 'sweater') { C.put(23, 26 + b, R.skin, 4); C.put(24, 26 + b, R.skin, 3); for (let x = 21; x <= 26; x++) if (C.ridAt(x, 27 + b) === R.cloth) C.shift(x, 27 + b, -1); }
+      if (o === 'tee') for (const [x, y, t] of [[24, 29, 4], [23, 30, 4], [24, 30, 3], [25, 30, 2], [24, 31, 2], [23, 29, 3], [25, 31, 1]]) C.put(x, y + b, R.accent, t);
+      if (o === 'buttonup') { C.put(22, 26 + b, R.white, 4); C.put(25, 26 + b, R.white, 3); C.put(23, 26 + b, R.skin, 3); C.put(24, 26 + b, R.skin, 3); for (let y = 28; y < 34; y += 2) C.put(24, y + b, R.white, 3); }
+      if (o === 'jacket') { for (let y = 26; y < 34; y++) { C.put(23, y + b, R.accent, 4); C.put(24, y + b, R.accent, 3); } C.put(22, 27 + b, R.cloth, 1); C.put(25, 27 + b, R.cloth, 1); }
+      if (o === 'hoodie') { C.paint(C.mask(and(ell(CX, 26.4 + b, 4.6, 1.6), (x, y) => true)), R.cloth, { base: 4, inner: false }); C.put(23, 27 + b, R.white, 4); C.put(25, 27 + b, R.white, 3); C.put(23, 28 + b, R.white, 3); C.put(25, 29 + b, R.white, 3); C.put(24, 31 + b, R.cloth, 1); C.put(23, 31 + b, R.cloth, 1); }
+      if (o === 'turtleneck') C.paint(C.mask(rect(21.6, 24.6 + b, 26.4, 27 + b)), R.cloth, { base: 4, inner: false });
+      if (o === 'sweater') for (let y = 29; y < 34; y += 2) for (let x = 20; x < 29; x += 2) if (C.ridAt(x + (y >> 1) % 2, y + b) === R.cloth) C.shift(x + (y >> 1) % 2, y + b, -1);
+      if (o === 'tech') { for (let k = 0; k < 7; k++) C.put(21 + k, 27 + k + b, R.glow, 4, true); C.put(20, 27 + b, R.glow, 3); C.put(28, 27 + b, R.glow, 3); }
+      if (o === 'flight') { for (let y = 25; y < 34; y++) C.put(24, y + b, R.steel, y % 2 ? 4 : 3); C.paint(C.mask(rect(26, 28.2 + b, 28.4, 30 + b)), R.accent, { base: 4, inner: false }); C.paint(C.mask(rect(21, 24.8 + b, 27, 26.4 + b)), R.cloth, { base: 4, inner: false }); }
+    } else {
+      if (o === 'hoodie') C.paint(C.mask(ell(27 + P.lean, 26.3 + b, 2.6, 1.6)), R.cloth, { base: 2 });
+      if (o === 'turtleneck' || o === 'flight') C.paint(C.mask(rect(22.4 + P.lean, 24.6 + b, 26.6 + P.lean, 26.6 + b)), R.cloth, { base: 4, inner: false });
+      if (o === 'tech') for (let y = 27; y < 33; y++) C.put(Math.round(nx + 1), y + b, R.glow, 4, true);
+      if (o === 'buttonup' || o === 'tee' || o === 'sweater') C.put(Math.round(nx), 26 + b, R.skin, 3);
+      if (o === 'jacket') for (let y = 27; y < 33; y++) C.put(Math.round(nx), y + b, R.accent, 3);
+    }
+    return m;
+  }
+
+  // armour and coats over the outfit
+  function drawBodyGear(C, R, P, view, gear) {
+    const B = P.B, b = P.b, g = gear.body;
+    if (g === 'none') return;
+    const side = view === 'left', cx = side ? 24.6 + P.lean : CX;
+    const tor = side ? (x, y) => { const yy = y - b; return yy > 26 && yy < 34.5 && Math.abs(x - cx) < B.depth + 0.4; }
+      : (x, y) => { const yy = y - b; return yy > 26.2 && yy < 34.5 && Math.abs(x - CX) < torsoHW(B, yy) + 0.4; };
+    if (g === 'thermal_wrap') {
+      const m = C.mask(side ? or(ell(cx - 0.4, 26.4 + b, 4.4, 1.6), rect(cx - 3.4, 26 + b, cx - 1.6, 30.5 + b)) : or(ell(CX, 26.4 + b, 5.4, 1.7), rect(CX + 1.6, 26 + b, CX + 3.4, 31 + b)));
+      C.paint(m, R.accent, { base: 3 });
+      for (let i = 0; i < W * H; i++) if (m[i] && ((i % W) + Math.floor(i / W)) % 3 === 0) C.set(i % W, Math.floor(i / W), R.accent, 2);
+    }
+    if (g === 'body_armor' || g === 'hardplate') {
+      const plate = g === 'hardplate', rid = plate ? R.gun : R.olive;
+      const m = C.mask(and(tor, (x, y) => y - b < 33.8 && (side || view === 'up' || Math.abs(x - CX) > 0.6 || y - b > 27.6)));
+      C.paint(m, rid, { base: 3, k: 1.7 });
+      // straps / plate seams
+      for (let x = 0; x < W; x++) if (m[(30 + b) * W + C.sx(x)]) C.shift(x, 30 + b, -1);
+      if (!side) for (let y = 27; y < 34; y++) { if (C.ridAt(CX - 4, y + b) === rid) C.shift(CX - 4, y + b, -1); if (C.ridAt(CX + 3, y + b) === rid) C.shift(CX + 3, y + b, -1); }
+      if (plate) {
+        for (const s of side ? [1] : [-1, 1]) {
+          const px = side ? cx + 0.4 : CX + s * (B.sw - 0.3);
+          C.paint(C.mask(ell(px, 27.6 + b, 2.6, 1.8)), R.steel, { base: 3, k: 1.8 });
+        }
+        if (view === 'down') { C.put(CX - 1, 31 + b, R.glow, 4, true); C.put(CX, 31 + b, R.glow, 3, true); }
+      }
+    }
+    if (g === 'cloak' || g === 'longcoat') {
+      const rid = g === 'cloak' ? R.dark : R.olive;
+      const end = g === 'cloak' ? 41.5 : 40;
+      const m = C.mask(side ? (x, y) => { const yy = y - b; if (yy < 26 || yy > end) return false; const back = B.depth + 0.8 + (yy - 26) * 0.18; const fr = B.depth + 0.4 + (yy > 34 ? (yy - 34) * 0.15 : 0); return x > cx - fr && x < cx + back; }
+        : (x, y) => { const yy = y - b; if (yy < 25.8 || yy > end) return false; const hw = yy < 30 ? torsoHW(B, yy) + 0.6 : B.sw + 0.4 + (yy - 30) * 0.12; return Math.abs(x - CX) < hw; });
+      // open front shows the outfit underneath
+      const open = view === 'down' ? (x, y) => Math.abs(x - CX) < (y - b - 26.5) * 0.28 + 0.4 : () => false;
+      const mm = new Uint8Array(W * H), om = C.mask(open);
+      for (let i = 0; i < W * H; i++) if (m[i] && !om[i]) mm[i] = 1;
+      C.paint(mm, rid, { base: 3 });
+      if (g === 'cloak' && view !== 'up') for (let y = 27; y < end; y += 3) { const x = view === 'down' ? CX + 4 : cx + 1; C.put(x, y + b, R.glow, 3, true); }
+      if (g === 'longcoat') for (let x = 0; x < W; x++) if (C.ridAt(x, 34 + b) === rid) C.put(x, 34 + b, R.leather, 2);
+    }
+  }
+
+  function drawBack(C, R, P, view, gear) {
+    const b = P.b, g = gear.back, B = P.B;
+    if (g === 'none') return;
+    const rid = g === 'tank' ? R.gun : g === 'sling' ? R.leather : R.accent;
+    if (view === 'up') {
+      const w = g === 'sling' ? 3 : 4.2;
+      C.paint(C.mask(rect(CX - w, 27.4 + b, CX + w, 34.4 + b)), rid, { base: 3, k: 1.6 });
+      if (g === 'tank') for (let y = 29; y < 33; y++) C.put(CX, y + b, R.glow, 4, true);
+      if (g === 'backpack') C.paint(C.mask(rect(CX - 3.4, 31 + b, CX + 3.4, 33.6 + b)), rid, { base: 2 });
+      return;
+    }
+    if (view === 'left') {
+      const x0 = 24.6 + P.lean + B.depth - 0.4;
+      C.paint(C.mask(rect(x0, 27.2 + b, x0 + (g === 'sling' ? 2.4 : 3.6), 34 + b)), rid, { base: 3 });
+      if (g === 'tank') C.put(Math.round(x0 + 2), 29 + b, R.glow, 4, true);
+      return;
+    }
+    // facing down: straps over the shoulders
+    for (const s of g === 'sling' ? [1] : [-1, 1]) for (let y = 26; y < 31; y++) C.put(CX + s * (B.sw - 2) - (s < 0 ? 1 : 0), y + b, R.dark, 2);
+  }
+
+  function drawHead(C, R, P, view, state) {
+    const B = P.B, b = P.b, L = P.lean;
+    // neck
+    if (view === 'left') C.paint(C.mask(rect(22.6 + L, 23 + b, 26.4 + L, 26.4 + b)), R.skin, { base: 2 });
+    else C.paint(C.mask(rect(21.8, 23 + b, 26.2, 26.4 + b)), R.skin, { base: 2 });
+    // from behind the jaw is hidden: below the skull the head narrows straight into the nape
+    const hm = C.mask(view === 'left' ? (x, y) => headSide(B, b)(x - L, y) : view === 'up' ? and(headFront(B, b), (x, y) => Math.abs(x - CX) < 3.4 + 4.1 * Math.sqrt(Math.max(0, 1 - (Math.max(0, y - b - 19.6) / 4) ** 2))) : headFront(B, b));
+    C.paint(hm, R.skin, { base: 3, k: 1.6, inner: false, vy: 0.3 });
+    // chin shadow onto the neck
+    for (let x = 0; x < W; x++) for (let y = 24; y < 27; y++) if (C.ridAt(x, y + b) === R.skin && !hm[(y + b) * W + C.sx(x)] && hm[(y + b - 1) * W + C.sx(x)]) C.shift(x, y + b, -1);
+    // ears
+    const pointed = state.ears === 'pointed', small = state.ears === 'small';
+    if (view === 'left') {
+      const ex = 26 + L;
+      C.paint(C.mask(or(ell(ex + 0.4, 18.6 + b, 1.4, small ? 1.6 : 2.1), pointed ? cap([[ex + 0.4, 18 + b], [ex + 2.6, 15 + b]], 0.8) : null)), R.skin, { base: 2, k: 1, innerTone: 2 });
+    } else {
+      for (const s of [-1, 1]) {
+        const ex = CX + s * (view === 'up' ? 7.4 : 7.8), ey = view === 'up' ? 18.2 : 18.8; // from behind the ears sit tighter
+        C.paint(C.mask(or(ell(ex, ey + b, 1.3, small ? 1.4 : 1.9), pointed ? cap([[ex, 18 + b], [ex + s * 2.2, 15 + b]], 0.75) : null)), R.skin, { base: s < 0 ? 3 : 2, k: 0.6, innerTone: 2 });
+      }
+    }
+    return hm;
+  }
+
+  function drawFace(C, R, P, view, state, gear) {
+    const b = P.b, fem = P.B.fem, L = P.lean, fh = state.facialHair || 'none';
+    if (view === 'up') return;
+    // a 2x2 eye: pupil over iris on the inner column, lash over a white on the outer column;
+    // women get a lash flick at the outer corner
+    const eye = (x, side) => {
+      C.put(x, 18 + b, R.ink, 0); C.put(x, 19 + b, R.iris, 2);
+      C.put(x + side, 18 + b, R.ink, fem ? 0 : 1); C.put(x + side, 19 + b, R.white, 4);
+      if (fem) C.put(x + 2 * side, 17 + b, R.ink, 1);
+    };
+    const brow = (x0, x1) => { for (let x = x0; x <= x1; x++) C.put(x, 16 + b, R.hair, fem ? 2 : 1); };
+    if (view === 'down') {
+      eye(20, -1); eye(27, 1);
+      if (state.browStyle === 'bushy' || !fem) { brow(19, 21); brow(26, 28); } else { brow(19, 20); brow(27, 28); }
+      C.put(24, 20 + b, R.skin, 2); // nose
+      if (state.blush !== false) { C.put(19, 21 + b, R.blush, 3); C.put(28, 21 + b, R.blush, 2); }
+      const lip = state.lips && state.lips !== 'natural' && fem;
+      C.put(23, 22 + b, lip ? R.lip : R.skin, lip ? 2 : 1); C.put(24, 22 + b, lip ? R.lip : R.skin, lip ? 2 : 1);
+      if (fh === 'stubble' || fh === 'beard') for (let y = 20; y < 26; y++) for (let x = 16; x < 33; x++) if (C.ridAt(x, y + b) === R.skin && (y > 21 || Math.abs(x - 24) > 4)) C.retint(x, y + b, [R.skin], fh === 'beard' ? R.hair : R.stubble);
+      if (fh === 'beard') { C.put(23, 22 + b, R.skin, 1); C.put(24, 22 + b, R.skin, 1); for (let x = 21; x < 28; x++) C.put(x, 25 + b, R.hair, 2); }
+      if (fh === 'mustache' || fh === 'handlebar' || fh === 'beard') for (let x = 22; x < 26; x++) C.put(x, 21 + b, R.hair, 2);
+      if (fh === 'handlebar') { C.put(21, 22 + b, R.hair, 2); C.put(26, 22 + b, R.hair, 2); }
+      if (fh === 'goatee') { C.put(23, 23 + b, R.hair, 2); C.put(24, 23 + b, R.hair, 2); C.put(23, 24 + b, R.hair, 1); C.put(24, 24 + b, R.hair, 1); }
+      if (state.marks === 'freckles') { C.put(20, 21 + b, R.skin, 2); C.put(27, 21 + b, R.skin, 2); }
+      if (state.marks === 'implant' || state.marks === 'circuit') C.put(29, 19 + b, R.glow, 4, true);
+      // eyewear
+      const ew = state.eyewear;
+      if (ew === 'glasses') { for (const x of [19, 21, 26, 28]) { C.put(x, 18 + b, R.gold, 3); C.put(x, 19 + b, R.gold, 2); } for (let x = 22; x <= 25; x++) C.put(x, 18 + b, R.gold, 3); }
+      if (ew === 'shades') { for (const x0 of [19, 26]) for (let x = x0; x < x0 + 3; x++) for (let y = 18; y < 20; y++) C.put(x, y + b, R.dark, 1); for (let x = 22; x <= 25; x++) C.put(x, 18 + b, R.dark, 1); C.put(19, 18 + b, R.white, 4); C.put(26, 18 + b, R.white, 3); }
+      if (ew === 'visor') for (let x = 18; x < 31; x++) for (let y = 18; y < 20; y++) { C.put(x, y + b, R.glow, y === 18 ? 4 : 3, true); }
+      if (ew === 'monocle') { C.put(26, 18 + b, R.gold, 3); C.put(28, 18 + b, R.gold, 3); C.put(26, 19 + b, R.gold, 2); C.put(28, 19 + b, R.gold, 2); C.put(27, 17 + b, R.gold, 3); C.put(27, 20 + b, R.gold, 2); }
+      return;
+    }
+    // facing left (mirrored for right)
+    const ex = 19 + L;
+    C.put(ex, 18 + b, R.ink, 0); C.put(ex, 19 + b, R.iris, 2); C.put(ex + 1, 18 + b, R.ink, fem ? 0 : 1); C.put(ex + 1, 19 + b, R.white, 4); if (fem) C.put(ex + 2, 17 + b, R.ink, 1);
+    for (let x = ex; x <= ex + (state.browStyle === 'bushy' || !fem ? 2 : 1); x++) C.put(x, 16 + b, R.hair, fem ? 2 : 1);
+    C.put(16 + L, 20 + b, R.skin, 3); C.put(17 + L, 21 + b, R.skin, 2); // nose tip and shadow
+    C.put(18 + L, 22 + b, fem && state.lips && state.lips !== 'natural' ? R.lip : R.skin, 1);
+    if (state.blush !== false) C.put(20 + L, 21 + b, R.blush, 3);
+    if (fh === 'stubble' || fh === 'beard') for (let y = 20; y < 27; y++) for (let x = 15; x < 27; x++) if (C.ridAt(x + L, y + b) === R.skin && (y > 21 || x > 22) && x > 17 - (y > 22 ? 1 : 0)) C.retint(x + L, y + b, [R.skin], fh === 'beard' ? R.hair : R.stubble);
+    if (fh === 'mustache' || fh === 'handlebar' || fh === 'beard') { C.put(17 + L, 21 + b, R.hair, 2); C.put(18 + L, 21 + b, R.hair, 2); }
+    if (fh === 'goatee') { C.put(18 + L, 23 + b, R.hair, 2); C.put(18 + L, 24 + b, R.hair, 1); }
+    const ew = state.eyewear;
+    if (ew === 'glasses' || ew === 'monocle') { C.put(ex - 1, 18 + b, R.gold, 3); C.put(ex + 1, 18 + b, R.gold, 3); C.put(ex - 1, 19 + b, R.gold, 2); C.put(ex + 1, 19 + b, R.gold, 2); if (ew === 'glasses') for (let x = ex + 2; x < 26 + L; x++) C.put(x, 18 + b, R.gold, 2); }
+    if (ew === 'shades') { for (let x = ex - 1; x <= ex + 1; x++) for (let y = 18; y < 20; y++) C.put(x, y + b, R.dark, 1); for (let x = ex + 2; x < 26 + L; x++) C.put(x, 18 + b, R.dark, 1); C.put(ex - 1, 18 + b, R.white, 3); }
+    if (ew === 'visor') for (let x = 16 + L; x < 23 + L; x++) for (let y = 18; y < 20; y++) C.put(x, y + b, R.glow, y === 18 ? 4 : 3, true);
+  }
+
+  // ---------- hair ----------
+  function hairMasks(C, P, view, st) {
+    const b = P.b, L = view === 'left' ? P.lean : 0, H = HAIR[st] || HAIR.bald, vol = H.vol || 0;
+    const end = HAIR_END[H.len || 0] + b, cx = view === 'left' ? 25 + L : CX;
+    // The hair mass is a squarish superellipse a little wider and flatter than the skull, so hair
+    // hides the round cranium (a bare dome reads as a balloon head) and puffs out over the ears.
+    const hv = H.cap === 'full' && !H.wet ? Math.max(vol, 1) : vol, rx = 8.9 + hv * 0.45, ry = 8.4 + hv * 0.35, hcy = 16.1 + b - hv * 0.25;
+    const skull = (x, y) => { const dx = Math.abs(x - cx) / rx, dy = (y - hcy) / ry; return dx ** 2.7 + Math.abs(dy) ** (dy < 0 ? 2.5 : 2) < 1; };
+    const back = [], front = [];
+    if (H.cap === 'none') return { back, front, H };
+    if (H.cap === 'buzz') return { back, front, H, buzz: true };
+    if (view === 'down') {
+      const hairline = x => {
+        const dx = Math.abs(x - CX);
+        switch (H.fringe) {
+          case 'bangs': return dx < 6.2 ? 15.6 : 18.5;
+          case 'side': return 15.8 - (x - CX + 7) * 0.24 + Math.max(0, dx - 5.5) * 1.2;
+          case 'tufts': { const k = ((x - CX + 8) % 4 + 4) % 4; return 14.2 + (k < 1.6 ? 1.4 - Math.abs(k - 0.8) : 0) + Math.max(0, dx - 5) * 0.9; }
+          case 'curls': return 14.6 + Math.sin(x * 1.7) * 0.7 + Math.max(0, dx - 5) * 0.5;
+          default: return 13.2 + Math.max(0, dx - 2.4) ** 2 * 0.26; // centre part
+        }
+      };
+      let capF = (x, y) => skull(x, y) && (y < hairline(x) + b || (Math.abs(x - CX) > 7.2 && y < 19.4 + b + hv * 0.3)); // side hair hangs over the ears
+      if (H.cap === 'mohawk') capF = (x, y) => Math.abs(x - CX) < 2.8 - Math.max(0, 9 + b - y) * 0.3 && y < 14.2 + b && y > 3.4 + b;
+      if (H.cap === 'undercut') capF = (x, y) => skull(x, y) && y < Math.min(hairline(x), 13.6) + b && x < CX + 7 && x > CX - 6;
+      front.push(capF);
+      if ((H.len || 0) >= 1 && H.cap === 'full') {
+        const curtain = (x, y) => { const dx = Math.abs(x - CX), yy = y - b; if (yy < 13 || y > end) return false; const outer = 8.4 + vol * 0.6 + Math.max(0, yy - 20) * (H.len >= 3 ? 0.1 : 0.05) - (H.len === 2 && yy > 22 ? (yy - 22) * 0.4 : 0); const inner = H.fringe === 'bangs' && yy < 16 ? 0 : yy < 19 ? 6.4 : 6.6; return dx < outer && dx > inner; };
+        front.push(curtain);
+        if (H.len >= 3) back.push((x, y) => Math.abs(x - CX) < 8.2 + vol * 0.7 && y > 14 + b && y < end);
+      }
+      if (H.spikes) front.push(or(...[-6, -3, 0, 3, 6].map(k => (x, y) => { const h = 4.4 + Math.abs(k) * 0.35; const t = (y - (h + b)) / (10.5 - h); return t > 0 && t < 1 && Math.abs(x - CX - k) < 0.4 + t * 1.6; })));
+            if (H.tails === 'pony') back.push(cap([[CX + 6.5, 11 + b], [CX + 9.2, 15 + b], [CX + 9.4, 21 + b], [CX + 8.4, 26 + b]], 1.7));
+      if (H.tails === 'pigtails') for (const s of [-1, 1]) front.push(cap([[CX + s * 7.6, 15 + b], [CX + s * 9.6, 21 + b], [CX + s * 9.2, 27 + b], [CX + s * 9.8, 31 + b]], 1.9));
+      if (H.tails === 'buns') for (const s of [-1, 1]) front.push(ell(CX + s * 6.4, 7.6 + b, 2.7, 2.6));
+      if (H.tails === 'braid') front.push(or(...[0, 1, 2, 3, 4].map(k => ell(CX + 7.4 + Math.sin(k) * 0.4, 21.5 + k * 2.4 + b, 1.6, 1.4))));
+      if (H.curly) front.push(or(...[-1, 1].map(s => or(ell(CX + s * 8.6, 20 + b, 2, 2.2), ell(CX + s * 8.2, 23.6 + b, 1.9, 2)))));
+      return { back, front, H, hairline, style: st };
+    }
+    if (view === 'up') {
+      // from behind, short hair runs down to the nape and covers the whole back of the head
+      let full = (x, y) => (skull(x, y) || (Math.abs(x - CX) < 7.6 - Math.max(0, y - b - 20) * 0.9 && y > 16 + b)) && y < (H.len >= 1 ? Math.max(end, 23.4 + b) : 23.4 + b - Math.max(0, Math.abs(x - CX) - 4) * 0.2);
+      if (H.cap === 'mohawk') full = (x, y) => Math.abs(x - CX) < 2.8 - Math.max(0, 9 + b - y) * 0.3 && y > 3.4 + b && y < 22 + b;
+      if (H.cap === 'undercut') full = (x, y) => skull(x, y) && y < 17.2 + b - Math.abs(x - CX) * 0.25;
+      const parts = [full];
+      if ((H.len || 0) >= 1 && H.cap === 'full') parts.push((x, y) => { const yy = y - b; if (yy < 12 || y > end) return false; const w = 8.3 + vol * 0.6 + Math.max(0, yy - 20) * (H.len >= 3 ? 0.08 : 0) - (H.len === 2 && yy > 22 ? (yy - 22) * 0.6 : 0) - (H.len === 1 && yy > 19 ? (yy - 19) * 0.9 : 0); return Math.abs(x - CX) < w; });
+      if (H.spikes) parts.push(or(...[-6, -3, 0, 3, 6].map(k => (x, y) => { const h = 4.4 + Math.abs(k) * 0.35; const t = (y - (h + b)) / (10.5 - h); return t > 0 && t < 1 && Math.abs(x - CX - k) < 0.4 + t * 1.6; })));
+      if (H.tails === 'pony') parts.push(cap([[CX, 10 + b], [CX + 0.6, 17 + b], [CX - 0.4, 23 + b], [CX + 0.4, 28 + b]], 1.9));
+      if (H.tails === 'pigtails') for (const s of [-1, 1]) parts.push(cap([[CX + s * 7.4, 15 + b], [CX + s * 9.4, 21 + b], [CX + s * 9.1, 27 + b], [CX + s * 9.6, 31 + b]], 1.9));
+      if (H.tails === 'buns') for (const s of [-1, 1]) parts.push(ell(CX + s * 6.4, 7.6 + b, 2.7, 2.6));
+      if (H.tails === 'braid') parts.push(or(...[0, 1, 2, 3].map(k => ell(CX - 7.2, 21.5 + k * 2.4 + b, 1.5, 1.4))));
+      if (H.curly) parts.push(or(...[-1, 1].map(s => or(ell(CX + s * 8.6, 20 + b, 2, 2.2), ell(CX + s * 8.2, 23.6 + b, 1.9, 2)))));
+      return { back, front: parts, H, style: st };
+    }
+    // facing left
+    const hx = 25 + L;
+    const sideLine = (x, y) => { // true where the face shows
+      const yy = y - b;
+      if (H.fringe === 'bangs') return x < hx - 1.6 && yy > 15.2 || x < hx + 1.5 && yy > 18.6;
+      if (H.fringe === 'tufts' || H.fringe === 'curls') return x < hx - 1.2 && yy > 14.2 + Math.max(0, x - 17 - L) * 0.1 || x < hx + 1.5 && yy > 17.8;
+      return x < hx - 1.6 && yy > 13.4 + Math.max(0, x - 18 - L) * 0.45 || x < hx + 1.5 && yy > 18;
+    };
+    let capF = (x, y) => skull(x, y) && !sideLine(x, y) && y < 22 + b;
+    if (H.cap === 'mohawk') capF = (x, y) => { const d = Math.hypot(x - hx, y - (16.2 + b)); return d > 6.6 && d < 10.4 && y < 15 + b && x > 17 + L && x < 33 + L; };
+    if (H.cap === 'undercut') capF = (x, y) => skull(x, y) && !sideLine(x, y) && y < 13.8 + b + Math.max(0, x - hx) * 0.2;
+    front.push(capF);
+    if ((H.len || 0) >= 1 && H.cap === 'full') front.push((x, y) => { const yy = y - b; if (yy < 12 || y > end) return false; const backX = hx + 8.2 + vol * 0.6 + Math.max(0, yy - 20) * (H.len >= 3 ? 0.14 : 0.04) - (H.len === 2 && yy > 22 ? (yy - 22) * 0.8 : 0); const frontX = hx + (yy < 21 ? 1.6 : 2.6); return x > frontX && x < backX; });
+    if (H.spikes) front.push(or(...[-5, -2, 1, 4].map(k => (x, y) => { const t = (y - (4.8 + b)) / 5.6; return t > 0 && t < 1 && Math.abs(x - hx - k - (1 - t) * 1.6) < 0.4 + t * 1.6; })));
+    if (H.cap === 'mohawk') front.push(or(...[-4, -1, 2, 5].map(k => (x, y) => { const t = (y - (3.6 + b)) / 4.4; return t > 0 && t < 1 && Math.abs(x - hx - k - (1 - t) * 1.4) < 0.3 + t * 1.3; })));
+    if (H.tails === 'pony') back.push(cap([[hx + 6.2, 10.8 + b], [hx + 9.6, 14 + b], [hx + 10.2, 20 + b], [hx + 9.2, 26 + b]], 1.8));
+    if (H.tails === 'pigtails') back.push(cap([[hx + 5.4, 15 + b], [hx + 7.6, 21 + b], [hx + 7.2, 27 + b], [hx + 7.8, 31 + b]], 1.9));
+    if (H.tails === 'buns') front.push(ell(hx + 3.8, 7.4 + b, 2.7, 2.6));
+    if (H.tails === 'braid') front.push(or(...[0, 1, 2, 3, 4].map(k => ell(hx + 1.2 - k * 0.3, 21.5 + k * 2.4 + b, 1.5, 1.4))));
+    if (H.curly) front.push(or(ell(hx + 7.4, 20.5 + b, 2.2, 2.2), ell(hx + 6.6, 24 + b, 2, 2)));
+    return { back, front, H, sideLine, style: st };
+  }
+
+  // Hair is painted as clumps: each pixel belongs to a lock (by angle around the crown on the
+  // scalp, by column where hair hangs), each lock is shaded across its width, seams between locks
+  // get a dark ink line, a sheen band catches the light on the upper left, and the fringe and
+  // silhouette are notched at the seams so the edge reads as separate locks.
+  function paintHair(C, R, masks, P, view) {
+    const H = masks.H, b = P.b, len = H.len || 0;
+    const m = C.mask(or(...masks.front));
+    const before = { rid: C.rid.slice(), tone: C.tone.slice(), ink: C.ink.slice() };
+    C.paint(m, R.hair, { base: H.wet ? 3 : 4, k: H.wet ? 1.7 : 1.4, inner: false, min: 1 });
+    const gx2sx = gx => C.flip ? W - gx : gx;
+    const crown = view === 'down' ? [CX - 1, 9.6 + b] : view === 'up' ? [CX + 1, 9.4 + b] : [25 + P.lean + 2.5, 10.4 + b];
+    const cx = gx2sx(crown[0]), cy = crown[1];
+    const n = H.curly ? 15 : H.sleek ? 9 : H.spikes ? 13 : 11;
+    const hangY = 19 + b; // below this, long hair hangs in vertical locks
+    const seed = Object.keys(HAIR).indexOf(masks.style || '') + 7;
+    const lockOf = (x, y) => {
+      const px = x + 0.5, py = y + 0.5;
+      if (len >= 2 && py > hangY) { const w = H.sleek ? 3.4 : H.wet ? 1.9 : 2.6; const jit = (hash(Math.floor(px / w), 0, seed) - 0.5) * 1.2; const v = (px + jit + (py - hangY) * (px < cx ? 0.06 : -0.06)) / w; return [1000 + Math.floor(v), v - Math.floor(v)]; }
+      const th = Math.atan2(py - cy, px - cx), rho = Math.hypot(px - cx, py - cy);
+      const v = ((th + Math.PI) / (2 * Math.PI)) * n + rho * (H.curly ? 0.18 : view === 'up' ? 0.08 : 0.06);
+      return [Math.floor(v) % n, v - Math.floor(v)];
+    };
+    const id = new Int32Array(W * H_).fill(-1), u = new Float32Array(W * H_);
+    for (let i = 0; i < W * H_; i++) if (m[i]) { const [k, f] = lockOf(i % W, Math.floor(i / W)); id[i] = k; u[i] = f; }
+    const cut = [];
+    for (let y = 0; y < H_; y++) for (let x = 0; x < W; x++) {
+      const i = y * W + x; if (!m[i]) continue;
+      let t = C.tone[i];
+      t += u[i] < 0.3 ? 1 : u[i] > 0.74 ? -1 : 0;                       // round each lock
+      const rho = Math.hypot(x + 0.5 - cx, y + 0.5 - cy);
+      const upperLeft = x + 0.5 < cx + 2 && y + 0.5 < cy + 6;
+      if (len < 2 || y + 0.5 <= hangY) { if (rho > 3.2 && rho < 5.6 && upperLeft && u[i] > 0.15 && u[i] < 0.6) t = 6; }   // sheen band
+      else if (Math.abs(y + 0.5 - (hangY + 2.5)) < 1 && x + 0.5 < cx + 3 && u[i] > 0.2 && u[i] < 0.55) t = Math.max(t, 5);
+      const nb = (j) => j >= 0 && j < W * H_ && m[j] && id[j] !== id[i];
+      const seam = (x + 1 < W && nb(i + 1)) || nb(i + W);
+      C.tone[i] = clamp(seam ? Math.min(t, 2) : t, 1, 6);
+      C.ink[i] = seam ? 0.28 : 0;
+      // notch the lower and outer edge at seams so the locks read individually
+      const below = y + 1 < H_ ? m[i + W] : 0, side = (x + 1 < W ? m[i + 1] : 0) && (x > 0 ? m[i - 1] : 0);
+      if (!below && y + 0.5 > cy + 2 && (u[i] < 0.16 || u[i] > 0.88) && !H.sleek && H.tails !== 'buns') cut.push(i);
+      else if (!side && y + 0.5 > cy + 4 && (u[i] < 0.12 || u[i] > 0.9) && len >= 1 && !H.sleek) cut.push(i);
+    }
+    for (const i of cut) { C.rid[i] = before.rid[i]; C.tone[i] = before.tone[i]; C.ink[i] = before.ink[i]; m[i] = 0; }
+    if (view === 'down' && H.fringe === 'part') for (let y = 9; y < 13; y++) { C.shift(CX - 1, y + b, -2, [R.hair]); }
+    // braid / bun links read better with a darker seam
+    if (H.tails === 'braid') for (let y = 0; y < H_; y++) for (let x = 0; x < W; x++) if (m[y * W + x] && (y - b) > 21 && (y - b - 21) % 2.4 < 0.6) C.shift(C.sx(x), y, -1, [R.hair]);
+    // the skin just under the hair gets a one-tone cast shadow (no hard line on the forehead)
+    for (let y = 1; y < H_; y++) for (let x = 0; x < W; x++) if (m[(y - 1) * W + x] && !m[y * W + x] && C.rid[y * W + x] === R.skin) C.tone[y * W + x] = Math.max(1, C.tone[y * W + x] - 1);
+    return m;
+  }
+  const H_ = H;
+
+  function paintBuzz(C, R, P, view, hm) {
+    const b = P.b;
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      if (!hm[y * W + x] || C.rid[y * W + x] !== R.skin) continue;
+      const gx = C.flip ? W - 1 - x : x;
+      let cover;
+      if (view === 'down') cover = y < 13.6 + b + Math.max(0, Math.abs(gx + 0.5 - CX) - 2.4) ** 2 * 0.26 || (Math.abs(gx + 0.5 - CX) > 7 && y < 18.5 + b);
+      else if (view === 'up') cover = y < 21.5 + b;
+      else cover = gx > 21 + P.lean && y < 19 + b && !(gx > 25 + P.lean && gx < 28 + P.lean && y > 16 + b) || y < 13.4 + b;
+      if (cover && (x + y) % 2 === 0) C.rid[y * W + x] = R.stubble;
+      else if (cover) C.rid[y * W + x] = R.stubble, C.tone[y * W + x] = Math.max(1, C.tone[y * W + x] - 1);
+    }
+  }
+
+  // ---------- head gear ----------
+  function drawHeadGear(C, R, P, view, state, gear, hairM) {
+    const b = P.b, L = view === 'left' ? P.lean : 0, g = gear.head, hx = view === 'left' ? 25 + L : CX;
+    if (state.extra === 'headphones' && g !== 'helmet') {
+      if (view === 'left') { C.paint(C.mask(ell(26 + L, 18.6 + b, 2.2, 2.6)), R.dark, { base: 3 }); C.paint(C.mask((x, y) => { const d = Math.hypot(x - hx, y - (16.4 + b)); return d > 8.4 && d < 9.6 && y < 17 + b && x > hx - 2 && x < hx + 4; }), R.dark, { base: 3 }); }
+      else { C.paint(C.mask((x, y) => { const d = Math.hypot(x - CX, y - (17 + b)); return d > 8.8 && d < 10 && y < 16 + b; }), R.dark, { base: 3 }); for (const s of [-1, 1]) C.paint(C.mask(ell(CX + s * 8.6, 18.6 + b, 1.6, 2.4)), R.dark, { base: 3 }); }
+    }
+    if (state.extra === 'bandana') {
+      if (view === 'left') C.paint(C.mask(and(rect(16 + L, 12.2 + b, 34 + L, 14.6 + b), ell(hx, 16.2 + b, 8.8, 8.8))), R.accent, { base: 3, k: 1 });
+      else C.paint(C.mask(and(rect(0, 12.6 + b, W, 14.8 + b), ell(CX, 16.2 + b, 8.9, 9))), R.accent, { base: 3, k: 1 });
+      if (view !== 'down') C.paint(C.mask(cap([[view === 'left' ? hx + 8 : CX + 1, 14 + b], [view === 'left' ? hx + 10 : CX + 2.5, 17.5 + b]], 0.9)), R.accent, { base: 2 });
+    }
+    if (state.extra === 'flower' && view !== 'up') { const fx = view === 'left' ? hx + 4 : CX + 5.5; C.paint(C.mask(ell(fx, 11 + b, 1.6, 1.5)), R.blush, { base: 4, k: 0.8 }); C.put(Math.round(fx - 0.5), 11 + b, R.gold, 4, true); }
+    if (state.extra === 'antennae') for (const s of view === 'left' ? [0] : [-1, 1]) {
+      const bx = view === 'left' ? hx + 1 : CX + s * 3, tx = view === 'left' ? hx - 1 : CX + s * 5;
+      const mm = C.mask(cap([[bx, 9.5 + b], [tx, 3.6 + b]], 0.55));
+      for (let i = 0; i < W * H; i++) if (mm[i]) C.set(i % W, Math.floor(i / W), R.skin, 2, true);
+      C.paint(C.mask(ell(tx, 3.2 + b, 1.3, 1.3)), R.glow, { base: 4, k: 0.6, keep: true });
+    }
+    if (state.extra === 'earrings' && view !== 'up') { if (view === 'left') C.put(26 + L, 21 + b, R.gold, 4); else { C.put(16, 21 + b, R.gold, 4); C.put(31, 21 + b, R.gold, 3); } }
+    if (g === 'none') return;
+    if (g === 'beanie') {
+      const m = C.mask(view === 'left' ? and(ell(hx + 0.2, 15.4 + b, 9, 8.4), (x, y) => y < 13.4 + b + Math.max(0, x - hx) * 0.18) : and(ell(CX, 15.6 + b, 9.1, 8.6), (x, y) => y < 13.6 + b));
+      C.paint(m, R.accent, { base: 3 });
+      for (let x = 0; x < W; x++) for (let y = 12; y < 14; y++) if (C.ridAt(x, y + b) === R.accent) C.shift(x, y + b, 1);
+      for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (m[y * W + x] && (x % 2 === 0) && y < 11 + b) C.tone[y * W + x] = Math.max(1, C.tone[y * W + x] - 1);
+    }
+    if (g === 'helmet') {
+      const m = C.mask(view === 'left' ? and(ell(hx + 0.4, 15.8 + b, 9.4, 9), (x, y) => y < 20 + b && !(x < hx - 2 && y > 15.4 + b)) : and(ell(CX, 15.8 + b, 9.4, 9), (x, y) => y < (view === 'up' ? 22 : 15.6) + b || (Math.abs(x - CX) > 7.4 && y < 21 + b)));
+      C.paint(m, R.gun, { base: 3, k: 1.8 });
+      if (view === 'down') for (let x = 17; x < 32; x++) { C.put(x, 15 + b, R.glow, x % 2 ? 4 : 3, true); }
+      if (view === 'left') for (let x = Math.round(hx - 7); x < hx - 2; x++) C.put(x, 15 + b, R.glow, 4, true);
+      if (view !== 'up') C.paint(C.mask(rect(view === 'left' ? hx + 2 : CX - 1, 6.2 + b, view === 'left' ? hx + 4 : CX + 1, 8.6 + b)), R.steel, { base: 4, k: 0.6 });
+    }
+    if (g === 'hood') {
+      const m = C.mask(view === 'left' ? and(ell(hx + 0.8, 16.6 + b, 9.4, 9.6), (x, y) => !(x < hx - 1.2 && y > 12.6 + b)) : view === 'up' ? ell(CX, 16.8 + b, 9.6, 9.8) : and(ell(CX, 16.8 + b, 9.6, 9.8), (x, y) => !(Math.abs(x - CX) < 6.6 && y > 12.4 + b)));
+      C.paint(m, R.dark, { base: 3 });
+      if (view === 'down') for (let x = 18; x < 31; x++) C.shift(x, 13 + b, -1);
+    }
+    if (g === 'goggles' && view !== 'up') {
+      if (view === 'down') { for (const x0 of [19, 26]) { C.paint(C.mask(ell(x0 + 1.5, 18.9 + b, 1.9, 1.6)), R.gun, { base: 3, k: 0.8 }); C.put(x0 + 1, 19 + b, R.glow, 4, true); C.put(x0 + 2, 18 + b, R.glow, 3, true); } C.put(17, 19 + b, R.dark, 1); C.put(30, 19 + b, R.dark, 1); C.put(23, 18 + b, R.gun, 2); C.put(24, 18 + b, R.gun, 2); }
+      else { C.paint(C.mask(ell(19.4 + L, 18.9 + b, 1.9, 1.6)), R.gun, { base: 3 }); C.put(19 + L, 19 + b, R.glow, 4, true); for (let x = 21 + L; x < 26 + L; x++) C.put(x, 18 + b, R.dark, 1); }
+    }
+    if (g === 'respirator' && view !== 'up') {
+      if (view === 'down') { C.paint(C.mask(ell(CX, 22.4 + b, 3.6, 2.3)), R.gun, { base: 3, k: 1.4 }); C.put(22, 22 + b, R.dark, 0); C.put(25, 22 + b, R.dark, 0); for (const s of [-1, 1]) for (let x = 1; x < 4; x++) C.put(CX + s * (3 + x) - (s < 0 ? 1 : 0), 21 + b, R.dark, 1); }
+      else { C.paint(C.mask(ell(17.6 + L, 22.2 + b, 2.6, 2.2)), R.gun, { base: 3 }); C.put(16 + L, 22 + b, R.dark, 0); for (let x = 20 + L; x < 26 + L; x++) C.put(x, 21 + b, R.dark, 1); }
+    }
+  }
+
+  // ---------- weapon ----------
+  function drawWeapon(C, R, P, view, gear, layer) {
+    const g = GEAR.weapon[gear.weapon];
+    if (P.angle == null) {
+      // carried: idle and walk show the weapon at the hip (knife and fists show nothing)
+      if (!g || !g.len || gear.weapon === 'utility_knife' || layer !== 'front' || view === 'up') return;
+      const hand = armPts(P, view, 0)[2];
+      const dir = view === 'left' ? [-0.25, 1] : [0.12 * (view === 'down' ? -1 : 1), 1];
+      return blade(C, R, g, gear, hand, dir, 0.75);
+    }
+    const a = rad(P.angle), dir = [Math.cos(a), Math.sin(a)];
+    const tipBehind = Math.sin(a) < -0.35;
+    if ((layer === 'back') !== tipBehind) return;
+    const hand = armPts(P, view, 0)[2];
+    if (!g || !g.len) { // punch: a small impact burst on the strike frame
+      if (P.punch >= 4 && layer === 'front') { const ix = Math.round(hand[0] + dir[0] * 3), iy = Math.round(hand[1] + dir[1] * 3); for (const [dx, dy] of [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]]) C.put(ix + dx, iy + dy, R.white, dx || dy ? 3 : 5, true); }
+      return;
+    }
+    if (P.smear && P.prev != null) smear(C, R, g, gear, P, hand);
+    blade(C, R, g, gear, hand, dir, 1);
+  }
+  function blade(C, R, g, gear, hand, dir, scale) {
+    const L = g.len * scale, [dx, dy] = dir, px = -dy, py = dx;
+    const at = t => [hand[0] + dx * t, hand[1] + dy * t];
+    const coreR = g.glow ? R.wglow : g.kind === 'pipe' || g.kind === 'baton' || g.kind === 'wrench' ? R.gun : R.steel;
+    const handle = g.kind === 'pipe' || g.kind === 'wrench' ? 0 : 2.2;
+    // grip
+    for (let t = -1.2; t < handle; t += 0.4) { const [x, y] = at(t); C.put(Math.round(x - 0.5), Math.round(y - 0.5), R.leather, 2, true); }
+    // crossguard for blades
+    if (g.kind === 'blade' && gear.weapon !== 'utility_knife') for (let s = -1.6; s <= 1.6; s += 0.5) { const [x, y] = at(handle); C.put(Math.round(x + px * s - 0.5), Math.round(y + py * s - 0.5), g.tier >= 2 ? R.gold : R.gun, 3, true); }
+    const thick = g.kind === 'pipe' ? 1.15 : g.kind === 'baton' ? 1.1 : gear.weapon === 'utility_knife' ? 0.8 : 1.05;
+    const m = C.mask(cap([at(handle + 0.4), at(L)], thick));
+    for (let i = 0; i < W * H; i++) if (m[i]) {
+      const x = i % W, y = Math.floor(i / W);
+      const gx = C.flip ? W - 0.5 - x : x + 0.5, side = (gx - hand[0]) * px + (y + 0.5 - hand[1]) * py;
+      C.set(x, y, coreR, side < -0.35 ? 5 : side < 0.35 ? 3 : 1, true);
+    }
+    // tip / head
+    const tip = at(L);
+    if (g.kind === 'wrench') { const mm = C.mask(and(ell(tip[0], tip[1], 2.1, 2.1), not(ell(tip[0] + dx * 1.2, tip[1] + dy * 1.2, 1, 1)))); for (let i = 0; i < W * H; i++) if (mm[i]) C.set(i % W, Math.floor(i / W), R.gun, 3, true); }
+    if (g.kind === 'blade' || g.kind === 'baton') C.put(Math.round(tip[0] - 0.5), Math.round(tip[1] - 0.5), g.glow ? R.wglow : R.steel, 5, true);
+    if (g.glow) for (let t = handle + 1; t < L; t += 0.7) { const [x, y] = at(t); C.glow(Math.round(x + px - 0.5), Math.round(y + py - 0.5), RIG_hex(g.glow), 0.35); C.glow(Math.round(x - px - 0.5), Math.round(y - py - 0.5), RIG_hex(g.glow), 0.35); }
+    if (g.kind === 'baton') for (let t = handle + 2; t < L; t += 2.4) { const [x, y] = at(t); C.put(Math.round(x - 0.5), Math.round(y - 0.5), R.wglow || R.glow, 5, true); }
+  }
+  function smear(C, R, g, gear, P, hand) {
+    // a thin crescent along the blade tip's path from the last frame's angle to this one,
+    // thickest next to the blade and tapering away; half strength and dithered on the follow-through
+    const rid = g.glow ? R.wglow : R.white, steps = 28;
+    for (let k = 0; k <= steps; k++) {
+      const u = k / steps, a = rad(lerp(P.prev, P.angle, u));
+      const th = 0.6 + u * 2.2;
+      for (let r = g.len + 0.4 - th; r <= g.len + 0.4; r += 0.5) {
+        if (P.smear < 1 && (k + Math.round(r * 2)) % 2) continue;
+        const x = Math.round(hand[0] + Math.cos(a) * r - 0.5), y = Math.round(hand[1] + Math.sin(a) * r - 0.5);
+        const sx = C.sx(x);
+        if (sx < 0 || sx >= W || y < 0 || y >= H) continue;
+        if (C.rid[y * W + sx] >= 0 && !C.keep[y * W + sx]) continue;
+        C.put(x, y, rid, u > 0.6 ? 5 : 4, true);
+      }
+    }
+  }
+  function RIG_hex(h) { h = h.replace('#', ''); return [0, 2, 4].map(i => parseInt(h.slice(i, i + 2), 16)); }
+
+  // ---------- one frame ----------
+  function renderFrame(state, dir, anim, f) {
+    const gear = gearOf(state);
+    const view = dir === 'right' ? 'left' : dir;
+    const C = new Canvas(dir === 'right');
+    const R = ramps(C, state, gear);
+    const P = pose(state, view, anim, f % ANIMS[anim].frames, gear);
+    const hm = hairMasks(C, P, view, state.hairStyle);
+    const hood = gear.head === 'hood' || gear.head === 'helmet';
+
+    // ground shadow
+    const sh = C.mask(ell(CX + (view === 'left' ? P.lean : 0), FOOT - 0.6, view === 'left' ? 6.6 : 7.4, 1.8));
+    const shadowPx = []; for (let i = 0; i < W * H; i++) if (sh[i]) shadowPx.push(i);
+
+    drawWeapon(C, R, P, view, gear, 'back');
+    if (view === 'down') {
+      if (!hood && hm.back.length) C.paint(C.mask(or(...hm.back)), R.hair, { base: 3, k: 1.3, min: 1 });
+      drawLegs(C, R, P, view, gear);
+      drawTorso(C, R, P, view, state, gear);
+      drawBodyGear(C, R, P, view, gear);
+      drawBack(C, R, P, view, gear);
+      drawArm(C, R, P, view, 1, state, gear);
+      drawArm(C, R, P, view, 0, state, gear);
+      const head = drawHead(C, R, P, view, state);
+      drawFace(C, R, P, view, state, gear);
+      if (hm.buzz && !hood) paintBuzz(C, R, P, view, head);
+      if (hm.front.length && !hood) paintHair(C, R, hm, P, view);
+      else if (hood && hm.front.length && gear.head === 'hood') { const hh = Object.assign({}, hm, { front: hm.front.slice(1) }); if (hh.front.length) paintHair(C, R, hh, P, view); }
+      drawHeadGear(C, R, P, view, state, gear);
+    } else if (view === 'up') {
+      drawLegs(C, R, P, view, gear);
+      drawTorso(C, R, P, view, state, gear);
+      drawBodyGear(C, R, P, view, gear);
+      drawArm(C, R, P, view, 1, state, gear);
+      drawArm(C, R, P, view, 0, state, gear);
+      const head = drawHead(C, R, P, view, state);
+      if (hm.buzz && !hood) paintBuzz(C, R, P, view, head);
+      if (hm.front.length && !hood) paintHair(C, R, hm, P, view);
+      drawBack(C, R, P, view, gear);
+      drawHeadGear(C, R, P, view, state, gear);
+    } else {
+      drawArm(C, R, P, view, 1, state, gear);
+      if (!hood && hm.back.length) C.paint(C.mask(or(...hm.back)), R.hair, { base: 3, k: 1.3, min: 1 });
+      drawBack(C, R, P, view, gear);
+      drawLegs(C, R, P, view, gear);
+      drawTorso(C, R, P, view, state, gear);
+      drawBodyGear(C, R, P, view, gear);
+      const head = drawHead(C, R, P, view, state);
+      drawFace(C, R, P, view, state, gear);
+      if (hm.buzz && !hood) paintBuzz(C, R, P, view, head);
+      if (hm.front.length && !hood) paintHair(C, R, hm, P, view);
+      drawHeadGear(C, R, P, view, state, gear);
+      drawArm(C, R, P, view, 0, state, gear);
+    }
+    C.outline();
+    drawWeapon(C, R, P, view, gear, 'front');
+    // ground shadow last, only where nothing is drawn
+    const shadowR = C.reg([[0, 0, 0]]);
+    for (const i of shadowPx) if (C.rid[i] < 0) { C.rid[i] = shadowR; C.tone[i] = 0; C.ov[i * 4 + 3] = 0; C.shadow = C.shadow || new Uint8Array(W * H); C.shadow[i] = 1; }
+    return C;
+  }
+
+  // RGBA for one frame (shadow pixels at 30% alpha)
+  function frameRGBA(state, dir, anim, f) {
+    const C = renderFrame(state, dir, anim, f);
+    const out = new Uint8ClampedArray(W * H * 4);
+    C.toRGBA(out, W, 0, 0);
+    if (C.shadow) for (let i = 0; i < W * H; i++) if (C.shadow[i]) { out[i * 4] = 20; out[i * 4 + 1] = 16; out[i * 4 + 2] = 30; out[i * 4 + 3] = 70; }
+    return out;
+  }
+
+  // Full sheet: one row per animation and direction, frames left to right.
+  function sheet(state) {
+    const rows = [];
+    for (const anim of Object.keys(ANIMS)) for (const dir of DIRS) rows.push({ anim, dir, frames: ANIMS[anim].frames, fps: ANIMS[anim].fps });
+    const cols = Math.max(...rows.map(r => r.frames));
+    const w = cols * W, h = rows.length * H;
+    const data = new Uint8ClampedArray(w * h * 4);
+    rows.forEach((r, ri) => {
+      for (let f = 0; f < r.frames; f++) {
+        const fr = frameRGBA(state, r.dir, r.anim, f);
+        for (let y = 0; y < H; y++) data.set(fr.subarray(y * W * 4, (y + 1) * W * 4), ((ri * H + y) * w + f * W) * 4);
+      }
+    });
+    const meta = {
+      generator: 'Pixel Portrait Creator sprite rig',
+      frame: { w: W, h: H }, anchor: { x: CX, y: FOOT }, columns: cols,
+      rows: rows.map((r, i) => ({ row: i, anim: r.anim, dir: r.dir, frames: r.frames, fps: r.fps, loop: r.anim !== 'attack' })),
+      hit: { frame: 2, note: 'the attack lands on frame 2 of each attack row' },
+      gear: gearOf(state),
+    };
+    return { w, h, data, meta };
+  }
+
+  function weaponDefault(world) { return world === 'cosmos' ? 'energy_blade' : world === 'underpass' ? 'pipe' : 'none'; }
+
+  return { W, H, DIRS, ANIMS, GEAR, SLOTS, HAIR, frameRGBA, sheet, gearOf, weaponDefault };
+})(typeof RIG !== 'undefined' ? RIG : require('./rig.js'));
+if (typeof module !== 'undefined') module.exports = SPRITE;
 
 </script>
 <script>
@@ -2183,18 +3223,21 @@ if (typeof module !== 'undefined') module.exports = RIG;
   }
 
   function update() {
+    if (!state.gear || typeof state.gear !== 'object') state.gear = cleanGear(null, world);
     if (panesKey !== world + '|' + state.sex) buildPanes();
     RIG.draw(portrait, state, portrait.width / N);
     Object.values(controls).forEach(f => f());
     drawGuides();
     document.getElementById('seedLabel').textContent = 'SEED ' + String(state.seed).padStart(6, '0');
     try { localStorage.setItem('rig.current', JSON.stringify(state)); } catch (e) {}
+    if (typeof spriteChanged === 'function') spriteChanged();
   }
 
   function roll() {
     seedCounter += 7919;
     let fresh = RIG.randomState(seedCounter, world, rollSex);
     locks.forEach(k => { fresh[k] = state[k]; });
+    fresh.gear = state.gear; // equipment is progression, not looks: it survives a re-roll
     fresh = RIG.fit(fresh, world, fresh.sex);
     if (locks.has('hairColor')) fresh.hairColor = state.hairColor;
     state = fresh;
@@ -2303,7 +3346,16 @@ if (typeof module !== 'undefined') module.exports = RIG;
       if (typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean') st[k] = v;
     });
     st.blush = st.blush === true;
+    st.gear = cleanGear(o.gear, w);
     return RIG.fit(st, w, st.sex);
+  }
+  // Equipment: only known slots and item names are kept; the rest falls back to the world's default.
+  function cleanGear(g, w) {
+    const out = { weapon: SPRITE.weaponDefault(w) };
+    if (g && typeof g === 'object' && !Array.isArray(g)) SPRITE.SLOTS.forEach(k => {
+      if (typeof g[k] === 'string' && Object.prototype.hasOwnProperty.call(SPRITE.GEAR[k], g[k])) out[k] = g[k];
+    });
+    return out;
   }
   function parseTemplates(text) {
     let data;
@@ -2405,6 +3457,62 @@ if (typeof module !== 'undefined') module.exports = RIG;
     say(rollSex === 'either' ? 'Randomize now rolls male or female.' : 'Showing and rolling ' + (rollSex === 'masc' ? 'male' : 'female') + ' and shared parts only.');
   }));
   paintSeg();
+
+  // ---- game sprite: animated preview, equipment and sheet export ----
+  const spriteCanvas = document.getElementById('sprite');
+  const sctx = spriteCanvas.getContext('2d');
+  let sDir = 'down', sAnim = 'walk', sFrames = [], sKey = '', sStart = 0;
+  try { const v = localStorage.getItem('rig.spriteAnim'); if (SPRITE.ANIMS[v]) sAnim = v; } catch (e) {}
+  const gearEl = document.getElementById('gear');
+  const SLOT_LABELS = { weapon: 'Weapon', head: 'Head', body: 'Body', hands: 'Hands', feet: 'Feet', back: 'Back' };
+  const gearSel = {};
+  SPRITE.SLOTS.forEach(slot => {
+    const lab = document.createElement('label');
+    lab.textContent = SLOT_LABELS[slot] || slot;
+    const sel = document.createElement('select');
+    Object.entries(SPRITE.GEAR[slot]).forEach(([id, item]) => { const o = document.createElement('option'); o.value = id; o.textContent = item.name; sel.appendChild(o); });
+    sel.addEventListener('change', () => { state.gear = Object.assign({}, SPRITE.gearOf(state), { [slot]: sel.value }); update(); say(SLOT_LABELS[slot] + ': ' + SPRITE.GEAR[slot][sel.value].name + '.'); });
+    lab.appendChild(sel); gearEl.appendChild(lab); gearSel[slot] = sel;
+  });
+  function segPaint(id, attr, val) { document.querySelectorAll('#' + id + ' button').forEach(b => b.setAttribute('aria-pressed', b.dataset[attr] === val ? 'true' : 'false')); }
+  document.querySelectorAll('#spriteDir button').forEach(b => b.addEventListener('click', () => { sDir = b.dataset.dir; segPaint('spriteDir', 'dir', sDir); spriteChanged(); }));
+  document.querySelectorAll('#spriteAnim button').forEach(b => b.addEventListener('click', () => { sAnim = b.dataset.anim; segPaint('spriteAnim', 'anim', sAnim); try { localStorage.setItem('rig.spriteAnim', sAnim); } catch (e) {} spriteChanged(); }));
+  segPaint('spriteAnim', 'anim', sAnim);
+  function spriteChanged() {
+    const g = SPRITE.gearOf(state);
+    SPRITE.SLOTS.forEach(k => { gearSel[k].value = g[k]; });
+    const key = JSON.stringify([recipeOf(state), sDir, sAnim]);
+    if (key === sKey) return;
+    sKey = key; sStart = performance.now();
+    sFrames = Array.from({ length: SPRITE.ANIMS[sAnim].frames }, (_, f) => new ImageData(SPRITE.frameRGBA(state, sDir, sAnim, f), SPRITE.W, SPRITE.H));
+    drawSprite(sStart);
+  }
+  let lastFrame = -1;
+  function drawSprite(now) {
+    if (!sFrames.length) return;
+    const A = SPRITE.ANIMS[sAnim];
+    // attacks play through then rest for a beat, so each swing reads on its own
+    const len = sAnim === 'attack' ? A.frames + 4 : A.frames;
+    let f = Math.floor(Math.max(0, now - sStart) / (1000 / A.fps)) % len;
+    if (f >= A.frames) f = 0;
+    if (f === lastFrame && now !== sStart) return;
+    lastFrame = f;
+    sctx.clearRect(0, 0, SPRITE.W, SPRITE.H);
+    sctx.putImageData(sFrames[f], 0, 0);
+  }
+  const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  (function tick(now) { if (!reduceMotion) drawSprite(now); requestAnimationFrame(tick); })(performance.now());
+  function sheetBlob() {
+    const sh = SPRITE.sheet(state);
+    const c = document.createElement('canvas'); c.width = sh.w; c.height = sh.h;
+    c.getContext('2d').putImageData(new ImageData(sh.data, sh.w, sh.h), 0, 0);
+    return { meta: sh.meta, png: new Promise(res => c.toBlob(res, 'image/png')) };
+  }
+  document.getElementById('saveSheet').addEventListener('click', async () => { saveBlob('sprite-' + state.seed + '.png', await sheetBlob().png); });
+  document.getElementById('saveSheetData').addEventListener('click', () => {
+    const { meta } = sheetBlob();
+    saveBlob('sprite-' + state.seed + '.json', jsonBlob(Object.assign({ image: 'sprite-' + state.seed + '.png', recipe: recipeOf(state) }, meta)));
+  });
 
   setWorld(world);
 })();

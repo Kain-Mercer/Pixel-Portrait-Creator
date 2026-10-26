@@ -1327,6 +1327,22 @@ const RIG = (function () {
   }
   function cap(part, o) { return Object.assign({ type: 'cap', part, hairline: hairlineStd(part), band: [7.5, 10.5], stripes: 14 }, o || {}); }
 
+  // Shaved or buzzed scalp: a stubble tint with sparse dots that never touch (a regular dither reads as
+  // a mesh cap), fading out over the last pixel and a half above the hairline so it blends into the forehead.
+  function shavedScalp(ctx, maxAx, dots) {
+    const { B, R } = ctx;
+    const hl = hairlineStd([32, 8]);
+    for (let y = 0; y < 30; y++) for (let x = 0; x < N; x++) {
+      if (!mget(ctx.headMask, x, y) || edge4(ctx.headMask, x, y)) continue;
+      const ax = Math.abs(x + 0.5 - CX), d = hl(x + 0.5) - (y + 0.5);
+      if (d < -0.5 || ax > maxAx) continue;
+      const r = hash2(x, y, 31);
+      if (d < 1.5 && r > (d + 0.5) / 2.2) continue;
+      B.retint(x, y, [R.skin], R.stubble);
+      if (d > 1 && hash2(x, y, 17) < dots && B.rid(x - 1, y) !== R.stubbleDot && B.rid(x, y - 1) !== R.stubbleDot) B.retint(x, y, [R.stubble], R.stubbleDot);
+    }
+  }
+
   const HAIR = {
     bald: { name: 'Bald', build() { return { back: [], front: [] }; } },
     buzz: {
@@ -1334,17 +1350,7 @@ const RIG = (function () {
       build() {
         return {
           back: [], front: [],
-          scalp(ctx) {
-            const { B, R } = ctx;
-            const hl = hairlineStd([32, 8]);
-            for (let y = 0; y < 30; y++) for (let x = 0; x < N; x++) {
-              if (!mget(ctx.headMask, x, y) || edge4(ctx.headMask, x, y)) continue;
-              const ax = Math.abs(x + 0.5 - CX);
-              if (y + 0.5 > hl(x + 0.5) - 0.5 || ax > 13.2) continue;
-              B.retint(x, y, [R.skin], R.stubble);
-              if ((x + y) % 2 === 0) B.retint(x, y, [R.stubble], R.stubbleDot);
-            }
-          },
+          scalp(ctx) { shavedScalp(ctx, 13.2, 0.5); },
         };
       },
     },
@@ -1406,17 +1412,7 @@ const RIG = (function () {
         front.push(L([[30, 7], [38, 6], [43, 14], [42, 24]], 3.4, 0.8, { tone: -0.3 }));
         return {
           back: [], front,
-          scalp(ctx) {
-            const { B, R } = ctx;
-            for (let y = 6; y < 30; y++) for (let x = 0; x < N; x++) {
-              const px = x + 0.5;
-              if (!mget(ctx.headMask, x, y) || edge4(ctx.headMask, x, y)) continue;
-              const ad = Math.abs(px - CX);
-              if (y + 0.5 > 17.6 + (ad > 7 ? (ad - 7) ** 2 * 0.33 : 0)) continue;
-              B.retint(x, y, [R.skin], R.stubble);
-              if ((x + y) % 2 === 0) B.retint(x, y, [R.stubble], R.stubbleDot);
-            }
-          },
+          scalp(ctx) { shavedScalp(ctx, 99, 0.3); },
         };
       },
     },
@@ -1471,16 +1467,21 @@ const RIG = (function () {
           const ex = 21 + k * 2.6;
           front.push(L([[P[0] - 1, P[1] + 0.5], [30 - k, 3], [ex + 6, 12], [ex, 21 + k * 0.6]], 3.8, 1.2, { tone: k % 2 ? -0.4 : 0, sheen: [0.22, 0.42] }));
         }
+        // side curtains: parallel lanes waving in phase, so each wave reads across the whole curtain
         [-1, 1].forEach(d => {
-          for (let k = 0; k < 3; k++) {
-            const base = CX + d * (16 + k * 1.6);
-            const segs = [[base - d * 2, 14 + k], [base + d * 3, 24], [base - d * 2.5, 36], [base + d * 2, 48 + k * 3]];
-            front.push(L(segs, 3.4, 1.4, { tone: (d > 0 ? -0.6 : 0) + (k % 2 ? -0.3 : 0), sheen: [0.18, 0.3] }));
-            front.push(L([[base + d * 2, 47 + k * 3], [base + d * 5, 52], [base - d * 1, 57], [base + d * 2.5, 62]], 2.8, 0.8, { tone: (d > 0 ? -0.8 : -0.2), sheen: [0.3, 0.5] }));
-          }
+          [13.8, 15.6, 17.4].forEach((o, k) => {
+            const segs = 6, len = 7.6, y0 = 12 + k * 0.8, amp = 1.3;
+            for (let i = 0; i < segs; i++) {
+              const ya = y0 + i * len, yb = ya + len, s2 = (i % 2 ? -1 : 1) * d;
+              const xa = CX + d * (o + i * 0.25), xb = CX + d * (o + (i + 1) * 0.25);
+              const last = i === segs - 1;
+              front.push(L([[xa, ya], [xa + s2 * amp, ya + len * 0.33], [xb + s2 * amp, ya + len * 0.67], [xb, yb]], last ? 3.2 : 3.4, last ? 0.8 : 3.2,
+                { sheet: true, tip: last, tone: (d > 0 ? -0.5 : 0) + (k % 2 ? -0.35 : 0), sheen: [0.12, 0.3] }));
+            }
+          });
         });
         const back = [];
-        [-1, 1].forEach(d => back.push(L([[CX + d * 5, 16], [CX + d * 22, 20], [CX + d * 18, 44], [CX + d * 22, 63]], 7, 5, { tip: false })));
+        [-1, 1].forEach(d => back.push(L([[CX + d * 5, 16], [CX + d * 19, 20], [CX + d * 17, 44], [CX + d * 18.5, 60]], 6, 4, { tip: false })));
         return { back, front };
       },
     },
@@ -1491,12 +1492,13 @@ const RIG = (function () {
         const front = [cap(P, { hairline: x => hairlineStd(P)(x) - 0.8, band: [7.5, 10], stripes: 26 })];
         front.push(...fanFringe(P, 5, 22, 40, (x, k) => 18 + [3, 1, 2, 0.5, 1.5][k], { w0: 3.0, w1: 0.8, sway: -1.5 }));
         front.push(L([[22, 14], [19, 18], [18.5, 26], [19.5, 33]], 1.6, 0.5, { sheen: [0.3, 0.5] }));
+        // tied high at the back of the crown; the tail falls behind the head and shows past the right cheek
         const back = [
-          L([[36, 4], [46, -2], [53, 8], [51, 24]], 5.2, 3.0, { tip: false }),
-          L([[51, 22], [49.5, 32], [53, 40], [50, 48]], 3.8, 0.8, { sheen: [0.2, 0.4] }),
-          L([[49, 22], [46, 30], [47, 38], [45, 44]], 3.0, 0.6),
+          L([[40, 6], [48, 5], [51.5, 12], [50.5, 22]], 5.4, 4.6, { tip: false }),
+          L([[50.5, 21], [49.5, 30], [51, 38], [48.5, 47]], 4.6, 1.0, { sheen: [0.2, 0.4] }),
+          L([[48.5, 20], [46.5, 28], [47.5, 36], [45.5, 42]], 3.2, 0.7),
         ];
-        front.push({ type: 'ball', c: [36.5, 5.6], r: 2.3, ridOverride: 'accent', swirl: false });
+        front.push({ type: 'ball', c: [44.6, 6.8], r: 2.3, ridOverride: 'accent', swirl: false });
         return { back, front };
       },
     },
@@ -1523,14 +1525,15 @@ const RIG = (function () {
           front.push(L([[P[0] + 1, 8], [30 + k, 4], [ex + 1, 11], [ex + 1.5, 19 + k * 1.2]], 3.4, 1.2, { tone: k % 2 ? -0.4 : 0 }));
         }
         front.push(L([[P[0], 8], [21, 9], [18, 16], [18, 24]], 3.0, 1.0));
-        const C = [[44, 20], [50, 30], [47, 44], [44, 58]];
-        for (let k = 0; k < 11; k++) {
-          const t = k / 10;
-          const c = cubic(C, t);
-          front.push({ type: 'ball', c, r: 3.1 - t * 0.6, sy: 0.68, tilt: (k % 2 ? 0.6 : -0.6), swirl: false, tone: -0.4 });
+        // a chunky braid over the right shoulder: overlapping links that alternate left and right
+        const C = [[44.5, 20], [49, 30], [46.5, 43], [43.5, 56]];
+        for (let k = 0; k < 12; k++) {
+          const t = k / 11;
+          const c = cubic(C, t), side = k % 2 ? 1 : -1;
+          front.push({ type: 'ball', c: [c[0] + side * 0.9, c[1]], r: 4.0 - t * 0.9, sy: 0.62, tilt: side * 0.7, swirl: false, tone: side > 0 ? -0.6 : -0.1 });
         }
-        front.push({ type: 'ball', c: cubic(C, 1.04), r: 1.6, ridOverride: 'accent' });
-        front.push(L([[44, 59], [43.5, 61], [45, 63], [44, 64]], 2.4, 0.6));
+        front.push({ type: 'ball', c: cubic(C, 1.03), r: 1.8, ridOverride: 'accent' });
+        front.push(L([[43.5, 57], [42.5, 59.5], [44.5, 62], [43.5, 64]], 3.4, 0.8));
         front.push(L([[38, 9], [45, 12], [46, 18], [44.5, 22]], 3.6, 2.4, { tip: false, tone: -0.4 }));
         return { back: [], front };
       },
@@ -1568,16 +1571,7 @@ const RIG = (function () {
         front.push(L([[CX + 2, 19], [CX + 1, 15], [CX + 3, 11], [CX + 6, 7]], 3.2, 0.5, { tone: -0.6 }));
         return {
           back: [], front,
-          scalp(ctx) {
-            const { B, R } = ctx;
-            for (let y = 6; y < 30; y++) for (let x = 0; x < N; x++) {
-              if (!mget(ctx.headMask, x, y) || edge4(ctx.headMask, x, y)) continue;
-              const ad = Math.abs(x + 0.5 - CX);
-              if (y + 0.5 > 17.6 + (ad > 7 ? (ad - 7) ** 2 * 0.33 : 0)) continue;
-              B.retint(x, y, [R.skin], R.stubble);
-              if ((x + y) % 2 === 0) B.retint(x, y, [R.stubble], R.stubbleDot);
-            }
-          },
+          scalp(ctx) { shavedScalp(ctx, 99, 0.3); },
         };
       },
     },
